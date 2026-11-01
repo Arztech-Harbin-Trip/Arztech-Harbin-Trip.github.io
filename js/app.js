@@ -256,15 +256,20 @@
   }
   async function dlPack(p) {
     if (!navigator.onLine) { toast('Perlukan internet (WiFi) untuk muat turun pakej'); return; }
-    if (!(await ask('Muat turun pakej ' + MT.PACKS[p].name + ' (' + MT.PACKS[p].approx + ')?\nGuna WiFi. Ia disimpan dalam telefon untuk guna offline.', '⬇ Muat turun'))) return;
+    const si = MT.storageInfo ? await MT.storageInfo() : null;
+    const free = si && si.quota ? si.quota - si.used : 0;
+    if (!(await ask('Muat turun pakej ' + MT.PACKS[p].name + ' (' + MT.PACKS[p].approx + ')?\n\nGuna WiFi & biarkan app terbuka sehingga siap. Jika terputus, tekan Muat turun sekali lagi — ia akan sambung.' + (free ? '\n\nRuang storan untuk app: ~' + fmtMB(free) : ''), '⬇ Muat turun'))) return;
     ui.dl = { p, pct: 0, loaded: 0, total: 0 };
     renderPack();
+    let wake = null;
+    try { if (navigator.wakeLock) wake = await navigator.wakeLock.request('screen'); } catch (e) {}
     try {
       await MT.download(p, pr => {
         ui.dl = Object.assign({ p }, pr);
         const bar = $('#dlBar'), txt = $('#dlTxt');
-        if (bar) bar.style.width = Math.round(pr.pct * 100) + '%';
-        if (txt) txt.textContent = fmtMB(pr.loaded) + ' / ' + fmtMB(pr.total) + ' (' + Math.round(pr.pct * 100) + '%)';
+        if (bar) bar.style.width = Math.round((pr.pct || 0) * 100) + '%';
+        if (txt) txt.textContent = pr.stage === 'engine' ? 'Menyediakan enjin terjemahan…'
+          : 'Fail ' + pr.idx + '/' + pr.count + ' · ' + fmtMB(pr.loaded || 0) + ' dimuat turun (' + Math.round((pr.pct || 0) * 100) + '%)';
       });
       try { navigator.serviceWorker && navigator.serviceWorker.controller && navigator.serviceWorker.controller.postMessage('cache-vendor'); } catch (e) {}
       ui.pack[p] = await MT.packStatus(p);
@@ -272,8 +277,16 @@
       toast(ui.pack[p] ? '✓ Pakej siap — terjemahan kini berfungsi offline' : 'Pakej dimuat turun, tetapi cache tidak dapat disahkan');
     } catch (e) {
       ui.dl = null; renderPack();
-      toast('Muat turun gagal: ' + (e && e.message ? e.message.slice(0, 120) : e));
-    }
+      const msg = (e && e.message) ? e.message : String(e);
+      const diag = 'Ralat: ' + msg + '\nPakej: ' + p + '\nPelayar: ' + navigator.userAgent + '\nApp: ' + (isStandalone() ? 'Home Screen' : 'pelayar') + (si ? '\nStoran: ' + fmtMB(si.used) + ' / ' + fmtMB(si.quota) : '');
+      sheet('<h2>⚠ Muat turun pakej gagal</h2><p style="margin-top:0">' + esc(msg) + '</p>' +
+        '<div class="note small">Fail yang sudah siap disimpan. Tekan <b>⬇ Muat turun</b> sekali lagi untuk <b>sambung</b>.<br>• Pastikan WiFi stabil & skrin tidak dikunci.<br>• Pada iPhone, cuba buka link dalam <b>Safari</b> (bukan dari WhatsApp).<br>• Mod Incognito/Private tidak boleh simpan pakej.</div>' +
+        '<textarea class="input" readonly rows="5" style="font-size:12px">' + esc(diag) + '</textarea>' +
+        '<div class="grid2" style="margin-top:10px"><button class="btn" id="dg-copy">📋 Salin ralat</button><button class="btn pri" id="dg-retry">↻ Cuba lagi</button></div>', sh => {
+          $('#dg-copy', sh).onclick = () => copyText(diag);
+          $('#dg-retry', sh).onclick = () => { closeSheet(); dlPack(p); };
+        });
+    } finally { try { wake && wake.release(); } catch (e) {} }
   }
   function relatedPhrases(text, max) {
     const STOP = ['saya', 'aku', 'nak', 'mahu', 'yang', 'dan', 'ini', 'itu', 'the', 'and', 'you', 'ada', 'untuk', 'dengan', 'kami', 'kita', 'boleh', 'tak', 'tidak', 'please', 'want'];
@@ -1342,7 +1355,7 @@
       '<li>Sentiasa buka app dari ikon Home Screen (data disimpan di situ).</li></ol>' +
       '<p class="small muted" style="margin:6px 0 0">Status: ' + (navigator.serviceWorker && navigator.serviceWorker.controller ? '✓ App sudah disimpan untuk guna offline.' : (location.protocol === 'file:' ? 'Dibuka sebagai fail tempatan.' : 'Belum disimpan offline — muat semula halaman sekali semasa online.')) + '</p></div>';
 
-    h += '<p class="small muted" style="text-align:center">Arztech Harbin Trip v9 · Semua harga & maklumat ialah anggaran — sahkan sebelum berlepas.</p>';
+    h += '<p class="small muted" style="text-align:center">Arztech Harbin Trip v10 · Semua harga & maklumat ialah anggaran — sahkan sebelum berlepas.</p>';
     v.innerHTML = h;
 
     const saveTrip = () => { S.trip.start = $('#tr-s').value; S.trip.end = $('#tr-e').value; save(); updateHeader(); };

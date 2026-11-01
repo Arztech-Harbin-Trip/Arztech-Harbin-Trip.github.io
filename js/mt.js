@@ -85,25 +85,91 @@ window.MT = (function () {
   }
 
   // Muat turun pakej: onProg({loaded,total,file,pct})
-  async function download(p, onProg) {
-    const files = {};
-    const cb = ev => {
-      if (ev.status === 'progress' && ev.file) {
-        files[ev.name + '/' + ev.file] = { loaded: ev.loaded || 0, total: ev.total || 0 };
-        let L = 0, T = 0;
-        Object.values(files).forEach(f => { L += f.loaded; T += f.total; });
-        onProg && onProg({ loaded: L, total: T, file: ev.file, pct: T ? L / T : 0 });
+  // Fail yang diperlukan oleh transformers.js untuk satu model MarianMT (q8, WebAssembly)
+  const HF = 'https://huggingface.co/';
+  const MODEL_FILES = ['config.json', 'generation_config.json', 'tokenizer_config.json', 'tokenizer.json', 'onnx/encoder_model_quantized.onnx', 'onnx/decoder_model_merged_quantized.onnx'];
+  const OPTIONAL = new Set(['generation_config.json']);
+  const fileUrl = (k, f) => HF + MODELS[k] + '/resolve/main/' + f;
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  // Simpan satu fail terus ke cache SEDIKIT DEMI SEDIKIT (tidak dimuatkan ke memori/enjin AI).
+  async function saveFile(cache, url, optional, onBytes) {
+    let lastErr;
+    for (let attempt = 1; attempt <= 4; attempt++) {
+      try {
+        const res = await fetch(url, { cache: 'no-store', credentials: 'omit' });
+        if (res.status === 404 && optional) return 0;
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const total = +res.headers.get('content-length') || 0;
+        const headers = { 'Content-Type': res.headers.get('content-type') || 'application/octet-stream' };
+        if (total) headers['Content-Length'] = String(total);
+        let got = 0;
+        if (res.body && typeof ReadableStream !== 'undefined') {
+          const reader = res.body.getReader();
+          const stream = new ReadableStream({
+            async pull(ctrl) {
+              const { done, value } = await reader.read();
+              if (done) { ctrl.close(); return; }
+              got += value.length; onBytes(got, total); ctrl.enqueue(value);
+            },
+            cancel(r) { try { reader.cancel(r); } catch (e) {} }
+          });
+          try { await cache.put(url, new Response(stream, { headers })); }
+          catch (e) {
+            if (got && total && got >= total) throw e;
+            // Pelayar tidak sokong simpan secara strim — muat turun semula sebagai satu blok
+            const r2 = await fetch(url, { cache: 'no-store', credentials: 'omit' });
+            if (!r2.ok) throw new Error('HTTP ' + r2.status);
+            const buf = await r2.arrayBuffer(); onBytes(buf.byteLength, buf.byteLength);
+            await cache.put(url, new Response(buf, { headers }));
+          }
+        } else {
+          const buf = await res.arrayBuffer(); onBytes(buf.byteLength, total || buf.byteLength);
+          await cache.put(url, new Response(buf, { headers }));
+        }
+        const chk = await cache.match(url);
+        if (!chk) throw new Error('Storan telefon menolak fail (mungkin penuh)');
+        return got;
+      } catch (e) {
+        lastErr = e;
+        if (attempt < 4) await sleep(1500 * attempt);
       }
-    };
-    // Simpan juga fail enjin & pinyin dalam cache service worker
-    try { await fetch(base() + 'pinyin-pro.js'); } catch (e) {}
-    for (const k of PACKS[p].keys) {
-      delete pipes[k];
-      await loadPipe(k, cb, true);
     }
+    throw lastErr || new Error('gagal');
+  }
+  // Muat turun pakej: onProg({loaded,total,file,pct,idx,count,stage})
+  async function download(p, onProg) {
+    const prog = o => { try { onProg && onProg(o); } catch (e) {} };
+    // 1) Enjin terjemahan (fail dalam laman ini) — supaya disimpan untuk guna offline
+    prog({ stage: 'engine', pct: 0, loaded: 0, total: 0, idx: 0, count: 0, file: 'enjin' });
+    try { await getLib(); } catch (e) { const er = new Error('ENJIN: ' + e.message + ' Telefon/pelayar mungkin terlalu lama (iPhone perlu iOS 16.4 ke atas).'); er.stage = 'engine'; throw er; }
+    for (const f of ['ort-wasm-simd-threaded.jsep.mjs', 'ort-wasm-simd-threaded.jsep.wasm', 'pinyin-pro.js']) {
+      try { const r = await fetch(base() + f); if (r.ok) await r.arrayBuffer(); } catch (e) {}
+    }
+    // 2) Fail model dari Hugging Face → cache 'transformers-cache' (sama seperti yang dibaca oleh enjin)
+    let cache;
+    try { cache = await caches.open('transformers-cache'); } catch (e) { const er = new Error('Storan cache tidak dapat dibuka (mod Incognito/Private?)'); er.stage = 'cache'; throw er; }
+    const jobs = [];
+    PACKS[p].keys.forEach(k => MODEL_FILES.forEach(f => jobs.push({ k, f, url: fileUrl(k, f) })));
+    let doneBytes = 0;
+    for (let i = 0; i < jobs.length; i++) {
+      const j = jobs[i];
+      if (await cache.match(j.url)) continue; // sudah ada — sambung dari sini
+      try {
+        const got = await saveFile(cache, j.url, OPTIONAL.has(j.f), (g, t) => prog({ stage: 'files', idx: i + 1, count: jobs.length, file: j.f, loaded: doneBytes + g, fileLoaded: g, fileTotal: t, pct: (i + (t ? g / t : 0)) / jobs.length }));
+        doneBytes += got;
+      } catch (e) {
+        const er = new Error((e && e.message ? e.message : 'gagal') + ' — fail ' + MODELS[j.k].split('/')[1] + '/' + j.f);
+        er.stage = 'files'; throw er;
+      }
+    }
+    prog({ stage: 'done', pct: 1, idx: jobs.length, count: jobs.length, loaded: doneBytes });
+    Object.keys(pipes).forEach(k => { if (PACKS[p].keys.includes(k)) delete pipes[k]; });
     setReady(p, true);
     try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
     return true;
+  }
+  async function storageInfo() {
+    try { const e = await navigator.storage.estimate(); return { used: e.usage || 0, quota: e.quota || 0 }; } catch (e) { return null; }
   }
 
   async function removePack(p) {
@@ -220,5 +286,5 @@ window.MT = (function () {
     return hits;
   }
 
-  return { MODELS, PACKS, supported, readyFlags, packStatus, download, removePack, translate, detect, wordByWord, pinyinOf, getLib };
+  return { MODELS, PACKS, storageInfo, supported, readyFlags, packStatus, download, removePack, translate, detect, wordByWord, pinyinOf, getLib };
 })();
