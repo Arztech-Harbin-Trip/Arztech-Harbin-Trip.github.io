@@ -236,7 +236,7 @@
     if (!box) return;
     const sup = mtSup();
     const need = ui.mtDir;
-    if (badge) badge.innerHTML = ui.pack[need] ? '<span class="in">● Offline sedia</span>' : '<span class="muted">○ Pakej belum ada</span>';
+    if (badge) badge.innerHTML = ui.pack[need] ? '<span class="in">● Offline sedia</span>' : (navigator.onLine ? '<span class="fx">● Online</span>' : '<span class="muted">○ Offline: kamus</span>');
     if (!sup.ok) { box.innerHTML = '<div class="note small" style="margin:10px 0 0">ℹ️ ' + esc(sup.why) + ' Buat masa ini, terjemahan guna kamus perkataan + frasa siap.</div>'; return; }
     if (ui.dl) {
       const pct = Math.round((ui.dl.pct || 0) * 100);
@@ -249,8 +249,9 @@
         (ui.pack[p] ? '<button class="btn sm ghost" data-pk="rm" data-p="' + p + '">Buang</button>' : '<button class="btn sm pri" data-pk="dl" data-p="' + p + '">⬇ Muat turun</button>') + '</div>';
     };
     const allReady = ui.pack.out && ui.pack.back && ui.pack.backms;
-    box.innerHTML = '<details class="pack"' + (!ui.pack.out ? ' open' : '') + '><summary class="small" style="cursor:pointer;font-weight:700;padding:8px 0">📦 Pakej terjemahan offline ' + (allReady ? '✓' : '(' + ((ui.pack.out ? 1 : 0) + (ui.pack.back ? 1 : 0) + (ui.pack.backms ? 1 : 0)) + '/3)') + '</summary>' +
-      (!ui.pack.out ? '<div class="small" style="margin-bottom:6px">Untuk terjemah <b>apa sahaja ayat</b> tanpa internet, muat turun pakej AI ke dalam telefon <b>sekali sahaja semasa di Malaysia (guna WiFi)</b>. Sumber pakej (Hugging Face) disekat di China, jadi buat sebelum berlepas.</div>' : '') +
+    box.innerHTML = '<div class="small muted" style="margin-top:8px">' + (navigator.onLine ? '🌐 Ada internet — butang Terjemah berfungsi terus.' : '📴 Tiada internet — ' + (ui.pack[ui.mtDir] ? 'guna pakej offline.' : 'guna kamus & frasa siap.')) + '</div>' +
+      '<details class="pack"><summary class="small" style="cursor:pointer;font-weight:700;padding:8px 0">📦 Pakej offline (untuk guna tanpa internet / di China) ' + (allReady ? '✓' : '(' + ((ui.pack.out ? 1 : 0) + (ui.pack.back ? 1 : 0) + (ui.pack.backms ? 1 : 0)) + '/3)') + '</summary>' +
+      '<div class="small" style="margin-bottom:6px">Tidak wajib bila ada internet. Untuk terjemah <b>tanpa internet</b> (contoh di China), muat turun pakej ke dalam telefon <b>sekali sahaja di Malaysia (guna WiFi)</b>.</div>' +
       row('out') + row('back') + row('backms') + '</details>';
   }
   async function dlPack(p) {
@@ -292,14 +293,14 @@
   function resHTML(r) {
     ui.mtLast = r;
     if (r.dir === 'back') {
-      return '<div class="mt-res"><div class="small muted">中文 → ' + (r.ms ? 'Bahasa Melayu & English' : 'English') + '</div>' +
+      return '<div class="mt-res"><div class="small muted">' + (r.online ? '🌐 Online · ' : '📴 Offline · ') + '中文 → ' + (r.ms ? 'Bahasa Melayu & English' : 'English') + '</div>' +
         (r.ms ? '<div class="small muted" style="margin-top:4px">🇲🇾 Bahasa Melayu</div><div class="en-big">' + esc(r.ms) + '</div><div class="small muted" style="margin-top:8px">🇬🇧 English</div><div class="en-big" style="font-size:17px">' + esc(r.en) + '</div>'
-          : '<div class="en-big">' + esc(r.en) + '</div>' + (!ui.pack.backms && mtSup().ok ? '<div class="small muted" style="margin-top:4px">💡 Muat turun pakej “+ Bahasa Melayu” di bawah untuk dapat terjemahan BM juga.</div>' : '')) +
+          : '<div class="en-big">' + esc(r.en) + '</div>' + (!r.online && !ui.pack.backms && mtSup().ok ? '<div class="small muted" style="margin-top:4px">💡 Bila ada internet, BM keluar terus. Untuk BM tanpa internet, muat turun pakej “+ Bahasa Melayu” di bawah.</div>' : '')) +
         '<div class="zh small" style="margin-top:6px;color:var(--red)">' + esc(r.zh) + '</div>' + (r.py ? '<div class="py small">' + esc(r.py) + '</div>' : '') +
         '<div class="acts">' + (r.ms ? '<button class="btn" data-mt="sayms">🔊 BM</button>' : '') + '<button class="btn" data-mt="sayen">🔊 EN</button><button class="btn" data-mt="reply">↩ Balas</button></div>' +
-        '<div class="small muted" style="margin-top:8px">🤖 Terjemahan mesin. Bahasa Melayu diterjemah melalui English, jadi baca kedua-duanya jika ayat kurang jelas.</div></div>';
+        '<div class="small muted" style="margin-top:8px">🤖 Terjemahan mesin — baca BM & EN bersama jika ayat kurang jelas.</div></div>';
     }
-    return '<div class="mt-res"><div class="small muted">' + ({ ms: 'Bahasa Melayu', en: 'English', zh: '中文' })[r.lang] + ' → 中文 (Mandarin)</div>' +
+    return '<div class="mt-res"><div class="small muted">' + (r.online ? '🌐 Online · ' : '📴 Offline · ') + ({ ms: 'Bahasa Melayu', en: 'English', zh: '中文' })[r.lang] + ' → 中文 (Mandarin)</div>' +
       '<div class="zhl zh">' + esc(r.zh) + '</div>' + (r.py ? '<div class="py">' + esc(r.py) + '</div>' : '') +
       (r.en && r.lang !== 'en' ? '<div class="en small" style="margin-top:4px"><b>EN:</b> ' + esc(r.en) + '</div>' : '') +
       '<div class="acts"><button class="btn pri" data-mt="say">🔊 Dengar</button><button class="btn" data-mt="slow">🐢</button><button class="btn" data-mt="show">⛶ Tunjuk</button><span class="grow"></span><button class="btn" data-mt="save" title="Simpan ke Frasa Saya">💾</button></div>' +
@@ -325,6 +326,43 @@
     return h + relatedHTML(text);
   }
   let mtBusy = false;
+  // ---- Terjemahan online (bila ada internet) — MyMemory API, tiada kunci diperlukan ----
+  function decodeEnt(t) { const ta = document.createElement('textarea'); ta.innerHTML = String(t || ''); return ta.value; }
+  function chunks(text) {
+    const parts = String(text).replace(/\s+/g, ' ').split(/(?<=[.!?。！？;；\n])\s*/).map(x => x.trim()).filter(Boolean);
+    const out = []; let cur = '';
+    parts.forEach(p => { if ((cur + ' ' + p).length > 400 && cur) { out.push(cur); cur = p; } else cur = cur ? cur + ' ' + p : p; });
+    if (cur) out.push(cur);
+    return out.slice(0, 8);
+  }
+  async function mm1(q, from, to) {
+    const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const tm = setTimeout(() => ctl && ctl.abort(), 10000);
+    try {
+      const r = await fetch('https://api.mymemory.translated.net/get?q=' + encodeURIComponent(q) + '&langpair=' + from + '|' + to, { signal: ctl ? ctl.signal : undefined, cache: 'no-store' });
+      const j = await r.json();
+      const t = j && j.responseData && j.responseData.translatedText;
+      if (!t || (j.responseStatus && +j.responseStatus !== 200) || /MYMEMORY WARNING|QUERY LENGTH LIMIT|INVALID LANGUAGE|PLEASE SELECT/i.test(t)) throw new Error((j && j.responseDetails) || 'Tiada hasil');
+      return decodeEnt(t).trim();
+    } finally { clearTimeout(tm); }
+  }
+  async function mm(text, from, to) {
+    const out = [];
+    for (const c of chunks(text)) out.push(await mm1(c, from, to));
+    return out.join(to.startsWith('zh') ? '' : ' ');
+  }
+  async function onlineTranslate(text, dir) {
+    const py = z => (window.MT && MT.pinyinOf ? MT.pinyinOf(z) : Promise.resolve(''));
+    if (dir === 'back') {
+      const [ms, en] = await Promise.all([mm(text, 'zh-CN', 'ms'), mm(text, 'zh-CN', 'en').catch(() => '')]);
+      return { dir, src: text, lang: 'zh', zh: text, ms, en, py: await py(text), online: true };
+    }
+    const lang = window.MT ? MT.detect(text) : 'ms';
+    if (lang === 'zh') return { dir, src: text, lang, zh: text, en: '', py: await py(text), online: true };
+    const from = lang === 'ms' ? 'ms' : 'en';
+    const [zh, en] = await Promise.all([mm(text, from, 'zh-CN'), lang === 'ms' ? mm(text, 'ms', 'en').catch(() => '') : Promise.resolve(text)]);
+    return { dir, src: text, lang, zh, en, py: await py(zh), online: true };
+  }
   async function doTranslate() {
     const ta = $('#mtIn'); if (!ta) return;
     const text = ta.value.trim(); ui.mtText = ta.value;
@@ -332,20 +370,29 @@
     if (mtBusy) return;
     const out = $('#mtOut');
     const sup = mtSup();
-    if (!sup.ok || !ui.pack[ui.mtDir]) {
-      const why = !sup.ok ? 'ℹ️ Terjemahan AI tidak tersedia di sini — guna kamus & frasa siap.' : '📦 Pakej terjemahan <b>' + esc(MT.PACKS[ui.mtDir].name) + '</b> belum dimuat turun (lihat di bawah). Sementara itu:';
-      ui.mtOutHTML = fallbackHTML(text, why); out.innerHTML = ui.mtOutHTML; return;
+    const offFull = sup.ok && ui.pack[ui.mtDir] && (ui.mtDir === 'out' || ui.pack.backms);
+    const offPart = sup.ok && ui.pack[ui.mtDir];
+    const canOnline = navigator.onLine && !window.HARBIN_SINGLE;
+    if (!offFull && !canOnline && !offPart) {
+      ui.mtOutHTML = fallbackHTML(text, '📴 Tiada internet' + (sup.ok ? ' dan pakej offline belum dimuat turun' : '') + '. Guna kamus & frasa siap:');
+      out.innerHTML = ui.mtOutHTML; return;
     }
     mtBusy = true;
     const go = $('#mtGo'); if (go) { go.disabled = true; go.textContent = '⏳…'; }
-    out.innerHTML = '<div class="mt-res small muted">⏳ Sedang menterjemah… (kali pertama selepas buka app ambil masa 5–20 saat untuk memuatkan model)</div>';
-    try {
-      const r = await MT.translate(text, ui.mtDir, { ms: ui.pack.backms });
+    out.innerHTML = '<div class="mt-res small muted">⏳ Sedang menterjemah…' + (offFull || !canOnline ? ' (kali pertama selepas buka app ambil masa 5–20 saat untuk memuatkan model offline)' : '') + '</div>';
+    let r = null, err = null;
+    if (!offFull && canOnline) {
+      try { r = await onlineTranslate(text, ui.mtDir); } catch (e) { err = e; }
+    }
+    if (!r && offPart) {
+      try { r = await MT.translate(text, ui.mtDir, { ms: ui.pack.backms }); } catch (e) { err = e; }
+    }
+    if (r) {
       ui.mtOutHTML = resHTML(r) + relatedHTML(text);
       S.mtHist = [{ dir: r.dir, src: r.src, zh: r.zh, en: r.en, ms: r.ms || '', py: r.py, t: Date.now() }].concat((S.mtHist || []).filter(x => x.src !== r.src)).slice(0, 30);
       save();
-    } catch (e) {
-      ui.mtOutHTML = fallbackHTML(text, '⚠ Gagal menterjemah (' + esc(e && e.message ? e.message.slice(0, 100) : 'ralat') + '). Guna kamus & frasa siap:');
+    } else {
+      ui.mtOutHTML = fallbackHTML(text, '⚠ Terjemahan ' + (canOnline ? 'online' : '') + ' gagal' + (err && err.message ? ' (' + esc(String(err.message).slice(0, 80)) + ')' : '') + '. Guna kamus & frasa siap:');
     }
     const o2 = $('#mtOut'); if (o2) o2.innerHTML = ui.mtOutHTML;
     renderHist();
@@ -428,28 +475,69 @@
   }
   // Pengecaman suara. Cuba mod dalam-peranti (offline) jika pelayar menyokong.
   const SRC = window.SpeechRecognition || window.webkitSpeechRecognition;
-  async function recognize(lang, btn, onText) {
-    if (!SRC) { toast('Mic app tidak disokong di sini — tekan 🎤 pada papan kekunci telefon'); return false; }
+  // Nota: SpeechRecognition.available()/install() (API Chrome baharu) menyebabkan pelayar crash — jangan digunakan.
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isStandalone = () => !!(navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches));
+  let curRec = null;
+  function micHelp(code) {
+    if (code === 'aborted') return;
+    if (code === 'no-speech') { toast('Tiada suara dikesan — dekatkan telefon & cakap sebaik selepas tekan 🎤'); return; }
+    const M = {
+      'not-allowed': 'Kebenaran mikrofon disekat untuk laman ini.',
+      'service-not-allowed': 'Perkhidmatan pengecaman suara disekat oleh telefon/pelayar.',
+      network: 'Pengecaman suara pelayar ini perlukan internet (dan pelayan Google/Apple boleh dicapai).',
+      'audio-capture': 'Mikrofon tidak dapat digunakan — mungkin sedang digunakan oleh app lain.',
+      'language-not-supported': 'Bahasa ini tidak disokong oleh pengecaman suara pelayar ini.',
+      unsupported: 'Pelayar ini tidak menyokong pengecaman suara dalam web.',
+      start: 'Mikrofon tidak dapat dimulakan.'
+    };
+    const tips = [];
+    if (code === 'not-allowed' || code === 'service-not-allowed') {
+      tips.push(isIOS ? '<b>iPhone:</b> Settings → Apps → Safari → <b>Microphone</b> → Allow. Pastikan juga Settings → General → Keyboard → <b>Enable Dictation</b> hidup, dan Settings → Screen Time → Content & Privacy → Siri & Dictation dibenarkan.'
+        : '<b>Android Chrome:</b> tekan ikon ⚙/🔒 di sebelah alamat laman → <b>Permissions → Microphone → Allow</b>, kemudian muat semula.');
+    }
+    if (isIOS && isStandalone()) tips.push('Pada iPhone, mic pelayar sering <b>tidak berfungsi dalam app Home Screen</b>. Buka link yang sama dalam <b>Safari</b> untuk guna butang 🎤 app.');
+    if (code === 'unsupported' && !isIOS) tips.push('Guna <b>Chrome</b> (Android) atau <b>Safari</b> (iPhone). Pelayar dalam WhatsApp/Instagram tidak menyokong mic.');
+    sheet('<h2>🎤 Mic tidak dapat digunakan</h2><p style="margin-top:0">' + esc(M[code] || ('Ralat: ' + code)) + '</p>' +
+      tips.map(t => '<div class="note info small">' + t + '</div>').join('') +
+      '<div class="note small"><b>✅ Cara paling pasti (juga offline & di China):</b> tekan kotak teks, kemudian tekan ikon <b>🎤 pada papan kekunci telefon</b> dan bercakap. Teks akan masuk sendiri.</div>' +
+      '<button class="btn pri block" id="mh-kb">⌨️ Buka papan kekunci sekarang</button>', sh => {
+        $('#mh-kb', sh).onclick = () => { closeSheet(); const ta = $('#mtIn') || $('#trq'); if (ta) { ta.focus(); ta.scrollIntoView({ block: 'center' }); } };
+      });
+  }
+  // onText(teks akhir), onInterim(teks semasa bercakap)
+  function recognize(lang, btn, onText, onInterim) {
+    if (curRec) { try { curRec.stop(); } catch (e) {} return true; } // tekan sekali lagi untuk berhenti
+    if (!SRC) { micHelp('unsupported'); return false; }
+    let r;
     try {
-      const r = new SRC();
-      r.lang = lang; r.interimResults = false; r.maxAlternatives = 1;
-      try {
-        if (typeof SRC.available === 'function') {
-          const st = await SRC.available({ langs: [lang], processLocally: true });
-          if (st === 'available') r.processLocally = true;
-        }
-      } catch (e) {}
-      if (btn) btn.classList.add('on');
-      r.onresult = e => { onText(e.results[0][0].transcript); };
-      r.onerror = e => toast(e.error === 'network' ? 'Mic app perlukan internet di telefon ini. Guna 🎤 pada papan kekunci (boleh offline).' : (e.error === 'not-allowed' ? 'Kebenaran mic ditolak' : (e.error === 'no-speech' ? 'Tiada suara dikesan' : 'Mic: ' + e.error)));
-      r.onend = () => { if (btn) btn.classList.remove('on'); };
-      r.start();
-      toast('Bercakap sekarang (' + (MICL[lang] || lang) + ')…');
-      return true;
-    } catch (e) { toast('Mic tidak dapat dimulakan'); return false; }
+      r = new SRC();
+      r.lang = lang; r.interimResults = true; r.continuous = false; r.maxAlternatives = 1;
+    } catch (e) { micHelp('start'); return false; }
+    let finalT = '', interimT = '', errored = false;
+    r.onstart = () => { if (btn) btn.classList.add('on'); toast('🎤 Mendengar (' + (MICL[lang] || lang) + ')… tekan 🎤 sekali lagi untuk berhenti'); };
+    r.onresult = e => {
+      interimT = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) finalT += t; else interimT += t;
+      }
+      if (onInterim) onInterim((finalT + interimT).trim());
+    };
+    r.onerror = e => { errored = true; micHelp(e.error); };
+    r.onend = () => {
+      curRec = null;
+      if (btn) btn.classList.remove('on');
+      const t = (finalT || interimT).trim();
+      if (t) onText(t);
+      else if (!errored) toast('Tiada suara dikesan — cuba lagi, atau guna 🎤 pada papan kekunci');
+    };
+    try { r.start(); curRec = r; } catch (e) { curRec = null; micHelp('start'); return false; }
+    return true;
   }
   function listen() {
-    recognize(ui.micLang, $('#mic'), t => { ui.trQ = t; const q = $('#trq'); if (q) q.value = t; renderTrList(); });
+    const setQ = t => { ui.trQ = t; const q = $('#trq'); if (q) q.value = t; renderTrList(); };
+    recognize(ui.micLang, $('#mic'), setQ, t => { const q = $('#trq'); if (q) q.value = t; });
   }
   function mtSpeakTarget() {
     const r = ui.mtLast; if (!r) return null;
@@ -480,7 +568,8 @@
     }
     if (e.target.closest('#mtMic')) {
       const lang = ui.mtDir === 'back' ? 'zh-CN' : (ui.micLang === 'zh-CN' ? 'ms-MY' : ui.micLang);
-      recognize(lang, $('#mtMic'), t => { const ta = $('#mtIn'); if (ta) { ta.value = t; ui.mtText = t; } doTranslate(); });
+      recognize(lang, $('#mtMic'), t => { const ta = $('#mtIn'); if (ta) { ta.value = t; ui.mtText = t; } doTranslate(); },
+        t => { const ta = $('#mtIn'); if (ta) { ta.value = t; ui.mtText = t; } });
       return;
     }
     const hi = e.target.closest('[data-hi]');
@@ -1183,7 +1272,7 @@
     const pt = prayerTimes(parseYmd(ui.ptDate || ptDate), HARBIN.lat, HARBIN.lng, HARBIN.tz);
     const qb = qibla(HARBIN.lat, HARBIN.lng);
     const zv = zhVoice();
-    let h = (ROLE === 'admin' ? adminPanelHTML() : annHTML() + userSyncHTML()) + shareCardHTML();
+    let h = (ROLE === 'admin' ? adminPanelHTML() + (onWeb() && LIVE_FEATURE ? liveAdminHTML() : '') : annHTML() + userSyncHTML() + (onWeb() && LIVE_FEATURE ? liveUserHTML() : '')) + shareCardHTML();
     h += '<div class="card"><h3>🗓️ Tarikh trip</h3><div class="grid2"><label class="field"><span>Pergi</span><input class="input" type="date" id="tr-s" value="' + esc(S.trip.start) + '"></label><label class="field"><span>Balik</span><input class="input" type="date" id="tr-e" value="' + esc(S.trip.end) + '"></label></div>' +
       (S.trip.start && S.trip.end ? '<div class="small muted">' + (daysBetween(S.trip.start, S.trip.end) + 1) + ' hari, ' + daysBetween(S.trip.start, S.trip.end) + ' malam</div>' : '<div class="small muted">Isi tarikh untuk kira detik ke Harbin.</div>') + '</div>';
 
@@ -1235,7 +1324,7 @@
       '<p class="small" style="margin-top:0">Cara paling boleh dipercayai bila offline: tekan kotak “Terjemah ayat sendiri”, kemudian tekan <b>🎤 pada papan kekunci telefon</b> dan bercakap. Teks keluar, tekan <b>Terjemah →</b>.</p>' +
       '<p class="small" style="margin:0 0 4px"><b>iPhone:</b> Settings → General → Keyboard → hidupkan <b>Enable Dictation</b>. Tambah papan kekunci <b>Malay</b> &amp; <b>Chinese Simplified (Pinyin)</b> supaya boleh dictate dalam BM &amp; 中文. iPhone baharu memproses dictation dalam peranti (offline).</p>' +
       '<p class="small" style="margin:0 0 8px"><b>Android (Gboard):</b> Gboard Settings → Voice typing → <b>Offline speech recognition</b> → muat turun <b>Malay</b>, <b>English</b> &amp; <b>中文 (普通话)</b>.</p>' +
-      (SRC && typeof SRC.install === 'function' ? '<button class="btn block" data-a="srinstall">⬇ Muat turun pengecaman suara offline untuk butang 🎤 app (Chrome)</button>' : '<p class="small muted" style="margin:0">Butang 🎤 dalam app guna pengecaman suara pelayar — kebanyakan telefon perlukan internet untuknya.</p>') +
+      '<p class="small muted" style="margin:0">Butang 🎤 dalam app guna pengecaman suara pelayar — kebanyakan telefon perlukan internet untuknya. Mic papan kekunci boleh offline.</p>' +
       '</div>';
 
     h += '<div class="card"><h3>🤖 Pakej terjemahan offline</h3><p class="small" style="margin-top:0">Pakej AI untuk terjemah ayat bebas (BM/EN → 中文 dan 中文 → EN) diurus dalam tab <b>Terjemah</b> → bahagian “📦 Pakej terjemahan offline”. Muat turun di Malaysia menggunakan WiFi (sumbernya disekat di China).</p>' +
@@ -1253,7 +1342,7 @@
       '<li>Sentiasa buka app dari ikon Home Screen (data disimpan di situ).</li></ol>' +
       '<p class="small muted" style="margin:6px 0 0">Status: ' + (navigator.serviceWorker && navigator.serviceWorker.controller ? '✓ App sudah disimpan untuk guna offline.' : (location.protocol === 'file:' ? 'Dibuka sebagai fail tempatan.' : 'Belum disimpan offline — muat semula halaman sekali semasa online.')) + '</p></div>';
 
-    h += '<p class="small muted" style="text-align:center">Arztech Harbin Trip v6 · Semua harga & maklumat ialah anggaran — sahkan sebelum berlepas.</p>';
+    h += '<p class="small muted" style="text-align:center">Arztech Harbin Trip v9 · Semua harga & maklumat ialah anggaran — sahkan sebelum berlepas.</p>';
     v.innerHTML = h;
 
     const saveTrip = () => { S.trip.start = $('#tr-s').value; S.trip.end = $('#tr-e').value; save(); updateHeader(); };
@@ -1287,6 +1376,19 @@
     if (!b) return;
     const a = b.dataset.a;
     if (['publish', 'pubfile', 'ghsave', 'ghclear'].includes(a)) { adminClick(a); return; }
+    if (a === 'livejoin') { liveJoinSheet(); return; }
+    if (a === 'lvnew') { ask('Jana kod kumpulan baharu? Ahli lama perlu kod baharu untuk terus berkongsi.', 'Jana').then(ok => { if (ok) { $('#lv-code').value = newCode(); } }); return; }
+    if (a === 'lvoff') { liveCfg().on = false; save(); liveStop(); renderIn(); return; }
+    if (a === 'lvsave') {
+      const c = liveCfg();
+      const db = normDb($('#lv-db').value), code = normCode($('#lv-code').value), name = $('#lv-name').value.trim();
+      if (!/^https:\/\/[^/]+\.(firebasedatabase\.app|firebaseio\.com)$/.test(db)) { toast('Alamat Firebase tidak sah — salin dari tab Data (…firebasedatabase.app)'); return; }
+      if (code.length < 8) { toast('Kod kumpulan sekurang-kurangnya 8 aksara'); return; }
+      if (!name) { toast('Isi nama anda'); return; }
+      c.db = db; c.code = code; c.on = true; S.myName = name; save(); liveStart(); renderIn();
+      toast('✅ Itinerari bersama aktif. Tekan 🚀 Terbitkan supaya pengguna dapat alamat pangkalan data.');
+      return;
+    }
     if (a === 'syncnow') { syncShared(true); return; }
     if (a === 'sharelink') { navigator.share({ title: 'Arztech Harbin Trip', text: 'App Arztech Harbin Trip — terjemahan, itinerari & bajet (boleh guna offline)', url: siteBase() }).catch(() => {}); return; }
     if (a === 'savehotel') { S.hotel = hotelVals(); save(); toast('Kad hotel disimpan'); }
@@ -1298,11 +1400,6 @@
     }
     else if (a === 'testv') speak('您好，我来自马来西亚');
     else if (a === 'gotr') setTab('tr');
-    else if (a === 'srinstall') {
-      SRC.install({ langs: ['ms-MY', 'en-US', 'zh-CN'], processLocally: true })
-        .then(ok => toast(ok ? '✓ Pengecaman suara offline dipasang' : 'Tidak dapat dipasang pada peranti ini'))
-        .catch(() => toast('Tidak dapat dipasang pada peranti ini'));
-    }
     else if (a === 'backup') download('harbin-trip-backup-' + today() + '.json', JSON.stringify(S, null, 1), 'application/json');
     else if (a === 'restore') $('#restoreFile').click();
     else if (a === 'reset') {
@@ -1340,6 +1437,8 @@
     if (x.ref) meta.push('🎫 ' + esc(x.ref));
     if (x.phone) meta.push('☎ <a href="tel:' + esc(x.phone.replace(/[^\d+]/g, '')) + '">' + esc(x.phone) + '</a>');
     if (x.cost) meta.push('💵 ' + (x.cur === 'MYR' ? RM(x.cost) : CNY(x.cost)) + (x.tx ? ' · ✓ direkod' : ''));
+    if (x.priv) meta.push('🔒 Peribadi');
+    else if (x.by && x.u && liveReady()) meta.push('✏️ ' + esc(x.by) + ' · ' + (new Date(x.u).toDateString() === new Date().toDateString() ? '' : fmtDs(ymd(new Date(x.u))) + ' ') + pad(new Date(x.u).getHours()) + ':' + pad(new Date(x.u).getMinutes()));
     return '<div class="iti' + (x.done ? ' done' : '') + (nxt ? ' next' : '') + '" data-itid="' + x.id + '">' + (nxt ? '<span class="nexttag">SETERUSNYA</span>' : '') +
       '<div class="tm">' + (x.t1 ? '<b class="num">' + esc(x.t1) + '</b>' : '<b class="muted">—</b>') + (x.t2 ? '<span class="num">hingga ' + esc(x.t2) + '</span>' : '') + '<span class="ic">' + T[1] + '</span></div>' +
       '<div class="grow">' +
@@ -1359,7 +1458,7 @@
     const days = tripDays();
     const t = today();
     const nx = nextItem();
-    let h = annHTML() + '<div class="card"><div class="row"><div class="grow"><div class="small muted" style="font-weight:700">ITINERARI TRIP</div>' +
+    let h = annHTML() + liveBarHTML() + '<div class="card"><div class="row"><div class="grow"><div class="small muted" style="font-weight:700">ITINERARI TRIP</div>' +
       (S.trip.start ? '<div style="font-weight:800;font-size:17px">' + fmtDs(S.trip.start) + (S.trip.end ? ' – ' + fmtDs(S.trip.end) + ' ' + parseYmd(S.trip.end).getFullYear() : '') + '</div><div class="small muted">' + (S.trip.end ? (daysBetween(S.trip.start, S.trip.end) + 1) + ' hari · ' : '') + items.length + ' aktiviti · ' + items.filter(x => x.done).length + ' selesai</div>' : '<div class="small">Tetapkan tarikh trip supaya hari-hari dijana automatik.</div>') +
       '</div><button class="btn sm" data-ia="dates">🗓 Tarikh</button></div>' +
       (nx ? '<hr class="sep"><div class="small"><b class="out">▶ Seterusnya:</b> ' + esc(nx.title || itype(nx.type)[2]) + ' · ' + fmtDs(nx.d) + (nx.t1 ? ' ' + esc(nx.t1) : '') + (nx.locZh || nx.loc ? ' · 📍 ' + esc(nx.loc || nx.locZh) : '') + '</div>' : '') +
@@ -1409,6 +1508,7 @@
       '<div class="seg" id="i-cur" style="margin:0;flex:none">' + [['CNY', '¥'], ['MYR', 'RM']].map(c => '<button data-cur="' + c[0] + '" class="' + (st.cur === c[0] ? 'on' : '') + '">' + c[1] + '</button>').join('') + '</div></div></label>' +
       (!isNew && +st.cost > 0 && !st.tx ? '<button class="btn block" id="i-rec" style="margin-bottom:10px">💰 Rekod kos ini ke Kewangan</button>' : '') +
       (st.off ? '<div class="note info small">📢 Aktiviti rasmi daripada penganjur. Jika anda ubah, versi anda dikekalkan walaupun penganjur kemas kini.' + (st.mod ? '</div><button class="btn block" id="i-revert" style="margin-bottom:10px">↺ Kembali ke versi penganjur</button>' : '</div>') : '') +
+      (liveReady() ? '<label class="row small" style="margin:0 0 12px"><input type="checkbox" id="i-priv" ' + (st.priv ? 'checked' : '') + ' style="width:20px;height:20px"> 🔒 Peribadi — jangan kongsi aktiviti ini dengan kumpulan</label>' : '') +
       '<div class="row"><button class="btn pri grow" id="i-save">Simpan</button>' + (!isNew ? '<button class="btn" id="i-dup" title="Salin">⧉</button><button class="btn red" id="i-del">Padam</button>' : '') + '</div>',
       sh => {
         sh.addEventListener('click', ev => {
@@ -1433,10 +1533,14 @@
           if (!st.title && !st.loc) { toast('Isi tajuk aktiviti'); return false; }
           if (!st.id) st.id = uid();
           if (st.off) st.mod = true;
+          const pv = $('#i-priv', sh);
+          if (pv) { if (pv.checked && !st.priv) itGone(st); st.priv = pv.checked; }
           if (st.tx) { const tx = S.tx.find(t => t.id === st.tx); if (tx) { tx.amt = +st.cost || tx.amt; tx.cur = st.cur; tx.d = st.d || tx.d; tx.note = st.title || tx.note; } }
-          S.itin = (S.itin || []).filter(i => i.id !== st.id).concat([Object.assign({}, st)]);
+          const saved = Object.assign({}, st);
+          itTouch(saved);
+          S.itin = (S.itin || []).filter(i => i.id !== st.id).concat([saved]);
           if (st.d && ui.itDay !== 'all' && ui.itDay !== st.d) ui.itDay = st.d;
-          save(); return true;
+          save(); liveFlush(); return true;
         };
         $('#i-save', sh).onclick = () => { if (commit()) { closeSheet(); renderIt(); toast(isNew ? 'Aktiviti ditambah' : 'Dikemas kini'); } };
         if ($('#i-rec', sh)) $('#i-rec', sh).onclick = () => {
@@ -1450,21 +1554,22 @@
           const orig = ((S.shared && S.shared.itin) || []).find(i => i.id === st.id);
           const cur = S.itin.find(i => i.id === st.id) || {};
           S.itin = S.itin.filter(i => i.id !== st.id);
-          if (orig) S.itin.push(Object.assign({}, orig, { off: true, mod: false, done: !!cur.done, tx: cur.tx }));
+          if (orig) { const o2 = Object.assign({}, orig, { off: true, mod: false, done: !!cur.done, tx: cur.tx }); itTouch(o2); S.itin.push(o2); liveFlush(); }
           save(); closeSheet(); renderIt(); toast('Dikembalikan ke versi penganjur');
         };
         if ($('#i-dup', sh)) $('#i-dup', sh).onclick = () => {
           grab();
           const cp = Object.assign({}, st, { id: uid(), done: false, tx: undefined, off: false, mod: false, title: st.title + ' (salinan)' });
-          S.itin.push(cp); save(); closeSheet(); renderIt(); itSheet(cp);
+          itTouch(cp); S.itin.push(cp); save(); liveFlush(); closeSheet(); renderIt(); itSheet(cp);
         };
         if ($('#i-del', sh)) $('#i-del', sh).onclick = async () => {
           if (!(await ask('Padam aktiviti ini?', 'Padam', true))) return;
           const old = S.itin.find(i => i.id === st.id);
           S.itin = S.itin.filter(i => i.id !== st.id);
           if (old && old.off) S.itinHidden = (S.itinHidden || []).concat([old.id]);
-          save(); closeSheet(); renderIt();
-          toast('Aktiviti dipadam', 'Batal', () => { S.itin.push(old); S.itinHidden = (S.itinHidden || []).filter(i => i !== old.id); save(); renderIt(); });
+          itGone(old);
+          save(); liveFlush(); closeSheet(); renderIt();
+          toast('Aktiviti dipadam', 'Batal', () => { itTouch(old); S.itin.push(old); S.itinHidden = (S.itinHidden || []).filter(i => i !== old.id); save(); liveFlush(); renderIt(); });
         };
       });
   }
@@ -1519,7 +1624,8 @@
     ];
     if (nDays > 5) L.push(mk(D(4), '07:00', '19:00', 'activity', 'Lawatan sehari: Yabuli / Snow Town (pilihan)', 'Yabuli Ski Resort', '亚布力滑雪旅游度假区', 'Biasanya ikut pakej tour.', 'Tempat jumpa: ikut pakej.'));
     L.push(mk(last, '', '', 'flight', 'Berlepas pulang', 'Harbin Taiping International Airport', '哈尔滨太平国际机场', 'Tiba di airport 3 jam awal.', 'Powerbank dalam beg kabin.'));
-    S.itin = (S.itin || []).concat(L.filter(x => x.d <= last));
+    const add = L.filter(x => x.d <= last); add.forEach(itTouch);
+    S.itin = (S.itin || []).concat(add); liveFlush();
     save(); renderIt(); toast('Contoh dimasukkan — ubah atau padam ikut pelan anda');
   }
   $('#v-it').addEventListener('click', e => {
@@ -1534,10 +1640,11 @@
     const a = b.dataset.ia;
     if (a === 'add') { itSheet(null, b.dataset.d); return; }
     if (a === 'dates') { itDatesSheet(); return; }
+    if (a === 'livejoin') { liveJoinSheet(); return; }
     if (a === 'copy') { copyText(itText()); return; }
     if (a === 'csv') { download('itinerari-harbin.csv', itCsv(), 'text/csv;charset=utf-8'); return; }
     if (a === 'sample') { if ((S.itin || []).length) ask('Tambah contoh itinerari kepada senarai sedia ada?', 'Tambah').then(ok => ok && sampleItin()); else sampleItin(); return; }
-    if (a === 'clear') { ask('Padam SEMUA aktiviti itinerari?', 'Padam semua', true).then(ok => { if (ok) { S.itinHidden = (S.itinHidden || []).concat(S.itin.filter(x => x.off).map(x => x.id)); S.itin = []; save(); renderIt(); } }); return; }
+    if (a === 'clear') { ask('Padam SEMUA aktiviti itinerari?', 'Padam semua', true).then(ok => { if (ok) { S.itinHidden = (S.itinHidden || []).concat(S.itin.filter(x => x.off).map(x => x.id)); S.itin.forEach(itGone); S.itin = []; save(); liveFlush(); renderIt(); } }); return; }
     const card = b.closest('[data-itid]');
     const x = card && S.itin.find(i => i.id === card.dataset.itid);
     if (!x) return;
@@ -1567,7 +1674,9 @@
   }
   function pubCfg() {
     const g = guessRepo();
-    S.pub = Object.assign({ repo: g.repo, branch: 'main', path: g.path, inc: { trip: true, itin: true, phr: true, ck: true }, lastV: 0, lastAt: '' }, S.pub || {});
+    if (!S.pub || typeof S.pub !== 'object') S.pub = {};
+    const d = { repo: g.repo, branch: 'main', path: g.path, inc: { trip: true, itin: true, phr: true, ck: true }, lastV: 0, lastAt: '' };
+    Object.keys(d).forEach(k => { if (S.pub[k] === undefined || (k === 'repo' && !S.pub.repo)) S.pub[k] = d[k]; });
     return S.pub;
   }
   function stripIt(x) { const o = {}; ['id', 'd', 't1', 't2', 'type', 'title', 'loc', 'locZh', 'detail', 'remark', 'ref', 'phone', 'cost', 'cur'].forEach(k => { if (x[k] !== undefined && x[k] !== '') o[k] = x[k]; }); return o; }
@@ -1580,7 +1689,8 @@
       announce: (S.announce || '').trim(),
       trip: inc.trip ? Object.assign({}, S.trip) : null,
       hotel: inc.trip ? Object.assign({}, S.hotel) : null,
-      itin: inc.itin ? sortIt(S.itin || []).map(stripIt) : null,
+      itin: inc.itin && !liveReady() ? sortIt((S.itin || []).filter(x => !x.priv)).map(stripIt) : null,
+      live: liveCfg().db ? { db: liveCfg().db } : null,
       phrases: inc.phr ? (S.mine || []).map(m => ({ ms: m.ms, en: m.en, zh: m.zh, py: m.py })) : [],
       ck: inc.ck ? { o, c: (S.custom || []).map(x => ({ id: x.id, cat: x.cat, name: x.name, note: x.note, qty: x.qty, price: x.price, pri: x.pri })) } : null
     };
@@ -1608,7 +1718,7 @@
     S.shared = d; S.sharedV = d.v;
     if (d.trip && d.trip.start) S.trip = Object.assign({}, S.trip, d.trip);
     if (d.hotel && (d.hotel.nameZh || d.hotel.addr || d.hotel.nameEn)) S.hotel = Object.assign({}, d.hotel);
-    if (Array.isArray(d.itin)) {
+    if (Array.isArray(d.itin) && !liveReady()) {
       const prev = {};
       (S.itin || []).filter(x => x.off).forEach(x => { prev[x.id] = x; });
       const hidden = new Set(S.itinHidden || []);
@@ -1631,7 +1741,7 @@
       if (ROLE === 'admin') { if (S.tab === 'in') renderIn(); return; }
       if (!d || !d.v) { if (manual) toast('Belum ada kandungan daripada penganjur'); return; }
       if (d.v <= (S.sharedV || 0)) { if (manual) toast('✓ Sudah versi terkini'); return; }
-      applyShared(d); save(); renderAll();
+      applyShared(d); save(); renderAll(); if (liveReady() && !LV.es) liveStart();
       toast('📢 Kemas kini daripada penganjur diterima');
     } catch (e) { if (manual) toast(navigator.onLine ? 'Gagal semak kemas kini' : 'Tiada internet — guna versi tersimpan'); }
   }
@@ -1709,6 +1819,188 @@
     }
   }
 
+  // =====================================================================
+  // 7) ITINERARI BERSAMA (LIVE) — Firebase Realtime Database melalui REST + SSE
+  //    Sesiapa dalam kumpulan ubah → semua telefon yang online dapat serta-merta.
+  //    Offline: perubahan disimpan dalam baris gilir & dihantar bila online.
+  // =====================================================================
+  // Ciri ditangguhkan: tukar kepada true untuk hidupkan semula itinerari bersama (Firebase)
+  const LIVE_FEATURE = true;
+  const LV = { es: null, status: 'off', retry: null, lastWho: '', flushing: false };
+  const LIVE_FIELDS = ['id', 'd', 't1', 't2', 'type', 'title', 'loc', 'locZh', 'detail', 'remark', 'ref', 'phone', 'cost', 'cur', 'u', 'by'];
+  function liveCfg() { if (!S.live || typeof S.live !== 'object') S.live = {}; const d = { db: '', code: '', on: false }; Object.keys(d).forEach(k => { if (S.live[k] === undefined) S.live[k] = d[k]; }); return S.live; }
+  function liveDb() { const c = liveCfg(); return c.db || (S.shared && S.shared.live && S.shared.live.db) || ''; }
+  function liveReady() { const c = liveCfg(); return !!(LIVE_FEATURE && c.on && c.code && liveDb() && onWeb()); }
+  function normDb(u) { u = String(u || '').trim().replace(/\/+$/, ''); if (u && !/^https?:\/\//.test(u)) u = 'https://' + u; return u; }
+  function normCode(c) { return String(c || '').trim().toUpperCase().replace(/[^A-Z0-9-]/g, ''); }
+  function liveBase() { return normDb(liveDb()) + '/g/' + encodeURIComponent(liveCfg().code); }
+  function liveItem(x) { const o = {}; LIVE_FIELDS.forEach(k => { if (x[k] !== undefined && x[k] !== '') o[k] = x[k]; }); return o; }
+  function newCode() { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = 'HRB-'; const r = crypto.getRandomValues(new Uint8Array(8)); r.forEach(n => { s += A[n % A.length]; }); return s; }
+  function setLive(st) { LV.status = st; const el = $('#liveBar'); if (el) el.outerHTML = liveBarHTML(); }
+  function liveBarHTML() {
+    if (!onWeb() || !LIVE_FEATURE) return '<div id="liveBar"></div>';
+    const q = (S.liveQ || []).length;
+    if (!liveReady()) return '<div id="liveBar" class="livebar off"><span class="grow">🔄 <b>Itinerari bersama</b> belum diaktifkan</span><button class="btn sm" data-ia="livejoin">Sertai</button></div>';
+    const st = !navigator.onLine ? ['wait', '⚪ Offline — ' + (q ? q + ' perubahan akan dihantar bila online' : 'guna salinan tersimpan')]
+      : LV.status === 'on' ? ['on', '🟢 Live — dikemas kini automatik untuk semua' + (q ? ' · menghantar ' + q + '…' : '')]
+      : LV.status === 'error' ? ['err', '🟠 Gagal sambung — cuba semula sebentar lagi']
+      : ['wait', '🟡 Menyambung…'];
+    return '<div id="liveBar" class="livebar ' + st[0] + '"><span class="grow">' + st[1] + '</span><span class="small muted">' + esc(liveCfg().code) + '</span></div>';
+  }
+  // Tandakan perubahan tempatan supaya dihantar kepada semua
+  function itTouch(x) {
+    if (!x || x.priv) return;
+    x.u = Date.now(); x.by = S.myName || (ROLE === 'admin' ? 'Admin' : 'Pengguna');
+    if (!liveReady()) return;
+    S.liveQ = (S.liveQ || []).filter(i => i !== x.id).concat([x.id]);
+  }
+  function itGone(x) {
+    if (!x || x.priv || !liveReady()) return;
+    S.liveDel = S.liveDel || {};
+    S.liveDel[x.id] = { id: x.id, del: true, u: Date.now(), by: S.myName || '' };
+    S.liveQ = (S.liveQ || []).filter(i => i !== x.id).concat([x.id]);
+  }
+  async function liveFlush() {
+    if (!liveReady() || !navigator.onLine || LV.flushing || !(S.liveQ || []).length) return;
+    LV.flushing = true;
+    try {
+      for (const id of (S.liveQ || []).slice()) {
+        const x = (S.itin || []).find(i => i.id === id);
+        const body = x ? (x.priv ? null : liveItem(x)) : ((S.liveDel || {})[id] || null);
+        if (body) {
+          const r = await fetch(liveBase() + '/items/' + encodeURIComponent(id) + '.json', { method: 'PUT', body: JSON.stringify(body) });
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+        }
+        S.liveQ = (S.liveQ || []).filter(i => i !== id);
+        if (S.liveDel) delete S.liveDel[id];
+        save();
+      }
+    } catch (e) { setLive('error'); setTimeout(liveFlush, 15000); }
+    LV.flushing = false;
+    const el = $('#liveBar'); if (el) el.outerHTML = liveBarHTML();
+  }
+  function liveMerge(map, full) {
+    let changed = 0, who = '';
+    const pend = new Set(S.liveQ || []);
+    Object.keys(map || {}).forEach(id => {
+      const r = map[id];
+      const i = (S.itin || []).findIndex(x => x.id === id);
+      const l = i >= 0 ? S.itin[i] : null;
+      if (l && l.priv) return;
+      if (pend.has(id)) return; // perubahan tempatan belum dihantar menang dahulu
+      if (!r || r.del) { if (l && (!r || (l.u || 0) <= (r.u || 0))) { S.itin.splice(i, 1); changed++; who = (r && r.by) || who; } return; }
+      if (!l) { S.itin.push(Object.assign({}, r, { live: 1 })); changed++; who = r.by || who; }
+      else if ((r.u || 0) > (l.u || 0)) { S.itin[i] = Object.assign({}, r, { live: 1, done: l.done, tx: l.tx, off: l.off, mod: l.mod }); changed++; who = r.by || who; }
+    });
+    if (full) {
+      // Pertama kali sambung: hantar aktiviti tempatan yang belum ada / lebih baharu
+      (S.itin || []).forEach(l => {
+        if (l.priv) return;
+        const r = (map || {})[l.id];
+        if (!r || (!r.del && (l.u || 0) > (r.u || 0))) {
+          if (!l.u) { l.u = Date.now(); l.by = l.by || S.myName || ''; }
+          S.liveQ = (S.liveQ || []).filter(x => x !== l.id).concat([l.id]);
+        }
+      });
+      liveFlush();
+    }
+    if (changed) {
+      save();
+      if (S.tab === 'it') renderIt();
+      if (!full || LV.lastWho !== 'init') toast('🔄 Itinerari dikemas kini' + (who && who !== S.myName ? ' oleh ' + who : ''));
+    }
+    LV.lastWho = 'ok';
+  }
+  function liveStop() { if (LV.es) { try { LV.es.close(); } catch (e) {} LV.es = null; } clearTimeout(LV.retry); }
+  function liveStart() {
+    liveStop();
+    if (!liveReady() || !navigator.onLine || typeof EventSource === 'undefined') { setLive('off'); return; }
+    setLive('wait');
+    let es;
+    try { es = new EventSource(liveBase() + '/items.json'); } catch (e) { setLive('error'); return; }
+    LV.es = es; LV.lastWho = 'init';
+    const onData = (ev, isPatch) => {
+      let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+      if (!m) return;
+      const parts = String(m.path || '/').split('/').filter(Boolean);
+      if (!parts.length) liveMerge(m.data || {}, !isPatch && LV.lastWho === 'init');
+      else if (parts.length === 1) liveMerge({ [parts[0]]: m.data }, false);
+      else liveRefetch();
+      setLive('on');
+    };
+    es.addEventListener('put', ev => onData(ev, false));
+    es.addEventListener('patch', ev => onData(ev, true));
+    es.addEventListener('cancel', () => { setLive('error'); toast('Akses itinerari bersama ditolak — semak tetapan Firebase'); liveStop(); });
+    es.onopen = () => { setLive('on'); liveFlush(); };
+    es.onerror = () => { setLive('error'); liveStop(); LV.retry = setTimeout(liveStart, 20000); };
+  }
+  async function liveRefetch() {
+    try { const r = await fetch(liveBase() + '/items.json', { cache: 'no-store' }); if (r.ok) liveMerge((await r.json()) || {}, false); } catch (e) {}
+  }
+  function liveJoinSheet(prefill) {
+    const c = liveCfg();
+    sheet('<h2>🔄 Itinerari bersama</h2>' +
+      '<p class="small" style="margin-top:0">Bila aktif, sesiapa dalam kumpulan yang ubah itinerari, semua telefon yang ada internet akan dapat perubahan itu <b>serta-merta</b>. Kewangan, checklist & bajet kekal peribadi.</p>' +
+      '<label class="field"><span>Nama anda (dipaparkan bila anda ubah aktiviti)</span><input class="input" id="lj-name" value="' + esc(S.myName || '') + '" placeholder="Contoh: Hazim"></label>' +
+      '<label class="field"><span>Kod kumpulan (daripada penganjur)</span><input class="input" id="lj-code" value="' + esc(prefill || c.code || '') + '" placeholder="HRB-XXXXXXXX" autocapitalize="characters" style="text-transform:uppercase;letter-spacing:1px"></label>' +
+      (!liveDb() ? '<label class="field"><span>Alamat pangkalan data (jika diberi penganjur)</span><input class="input" id="lj-db" value="' + esc(c.db) + '" placeholder="https://xxxx-default-rtdb.asia-southeast1.firebasedatabase.app"></label>' : '') +
+      '<button class="btn pri block" id="lj-go">' + (c.on ? 'Simpan' : 'Sertai') + '</button>' +
+      (c.on ? '<div style="height:8px"></div><button class="btn block" id="lj-off">Berhenti kongsi (itinerari kekal dalam telefon)</button>' : ''),
+      sh => {
+        $('#lj-go', sh).onclick = () => {
+          const code = normCode($('#lj-code', sh).value), name = $('#lj-name', sh).value.trim();
+          const dbEl = $('#lj-db', sh);
+          if (dbEl && dbEl.value.trim()) c.db = normDb(dbEl.value);
+          if (code.length < 8) { toast('Kod kumpulan tidak sah (sekurang-kurangnya 8 aksara)'); return; }
+          if (!liveDb()) { toast('Alamat pangkalan data belum ada — minta daripada penganjur'); return; }
+          if (!name) { toast('Isi nama anda'); return; }
+          S.myName = name; c.code = code; c.on = true; save(); closeSheet();
+          liveStart(); renderAll(); toast('✅ Itinerari bersama aktif');
+        };
+        if ($('#lj-off', sh)) $('#lj-off', sh).onclick = () => { c.on = false; save(); liveStop(); closeSheet(); renderAll(); };
+      });
+  }
+  function liveAdminHTML() {
+    const c = liveCfg();
+    const invite = siteBase() + '#g=' + encodeURIComponent(c.code || '') + (c.db ? '&db=' + encodeURIComponent(c.db.replace(/^https:\/\//, '')) : '');
+    return '<div class="card adminc"><h3>🔄 Itinerari bersama (live)</h3>' +
+      '<p class="small" style="margin-top:0">Semua ahli kumpulan boleh ubah itinerari, dan perubahan sampai kepada semua yang online serta-merta.</p>' +
+      '<label class="field"><span>Alamat Firebase Realtime Database</span><input class="input" id="lv-db" value="' + esc(c.db) + '" placeholder="https://xxxx-default-rtdb.asia-southeast1.firebasedatabase.app"></label>' +
+      '<label class="field"><span>Kod kumpulan</span><div class="row"><input class="input grow" id="lv-code" value="' + esc(c.code || newCode()) + '" style="letter-spacing:1px"><button class="btn sm" data-a="lvnew">↻ Baharu</button></div></label>' +
+      '<label class="field"><span>Nama anda</span><input class="input" id="lv-name" value="' + esc(S.myName || '') + '" placeholder="Contoh: Hazim"></label>' +
+      '<button class="btn pri block" data-a="lvsave">' + (c.on ? '💾 Simpan' : '▶ Aktifkan itinerari bersama') + '</button>' +
+      (c.on && c.code && c.db ? '<hr class="sep"><div class="small"><b>Link jemputan</b> — hantar kepada ahli kumpulan (WhatsApp). Mereka buka link ini dahulu, kemudian tekan Add to Home Screen:</div>' +
+        '<div class="qr">' + qrSVG(invite) + '</div><div class="linkbox"><span class="grow">' + esc(invite) + '</span><button class="btn sm" data-copy="' + esc(invite) + '">Salin</button></div>' +
+        '<p class="small muted">Yang sudah pasang app: Itinerari → <b>Sertai</b> → masukkan kod <b>' + esc(c.code) + '</b>. Alamat pangkalan data dihantar automatik bila anda tekan 🚀 Terbitkan.</p>' +
+        '<button class="btn block" data-a="lvoff">Matikan untuk telefon ini</button>' : '') +
+      '<details style="margin-top:12px"><summary class="small" style="cursor:pointer;font-weight:700">📘 Cara sediakan Firebase (sekali sahaja, percuma)</summary><ol class="list-plain small" style="margin-top:8px">' +
+      '<li>Buka <b>console.firebase.google.com</b> → log masuk akaun Google → <b>Create a project</b> (nama: arztech-harbin-trip). Google Analytics boleh dimatikan.</li>' +
+      '<li>Menu kiri <b>Build → Realtime Database</b> → <b>Create Database</b> → lokasi <b>Singapore (asia-southeast1)</b> → pilih <b>Start in locked mode</b> → Enable.</li>' +
+      '<li>Tab <b>Rules</b> → padam semua → tampal peraturan di bawah → <b>Publish</b>.</li>' +
+      '<li>Tab <b>Data</b> → salin alamat di atas (bermula https:// dan berakhir .firebasedatabase.app) → tampal dalam kotak “Alamat Firebase” di atas.</li></ol>' +
+      '<textarea class="input" readonly rows="9" style="font-family:monospace;font-size:12px">' + esc(FB_RULES) + '</textarea><button class="btn sm" data-copy="' + esc(FB_RULES) + '" style="margin-top:6px">Salin peraturan</button></details>' +
+      '</div>';
+  }
+  const FB_RULES = JSON.stringify({ rules: { '.read': false, '.write': false, g: { $code: { '.read': '$code.length >= 8', '.write': '$code.length >= 8', items: { $id: { '.validate': 'newData.hasChild(\'u\') && newData.child(\'u\').isNumber()' } } } } } }, null, 2);
+  function liveUserHTML() {
+    const c = liveCfg();
+    return '<div class="card"><h3>🔄 Itinerari bersama</h3>' +
+      (c.on ? '<p class="small" style="margin-top:0">Aktif · kod <b>' + esc(c.code) + '</b> · nama: <b>' + esc(S.myName || '-') + '</b></p>' : '<p class="small muted" style="margin-top:0">Belum aktif. Minta kod kumpulan daripada penganjur.</p>') +
+      '<button class="btn block" data-ia="livejoin">' + (c.on ? '⚙ Tetapan' : '➕ Sertai dengan kod') + '</button></div>';
+  }
+  // Link jemputan: #g=KOD&db=HOST
+  (function joinFromHash() {
+    const h = location.hash || '';
+    const m = h.match(/[#&]g=([^&]+)/);
+    if (!m) return;
+    const c = liveCfg();
+    const code = normCode(decodeURIComponent(m[1]));
+    const db = (h.match(/[&]db=([^&]+)/) || [])[1];
+    if (db) c.db = normDb(decodeURIComponent(db));
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+    if (code.length >= 8 && LIVE_FEATURE) { c.code = code; save(); setTimeout(() => liveJoinSheet(code), 400); }
+  })();
+
   // ---------- Header, tab & permulaan ----------
   function updateHeader() {
     const c = $('#countdown');
@@ -1733,8 +2025,9 @@
   }
   function renderAll() { updateHeader(); RENDER[S.tab](); }
   $$('nav.tabs button').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
-  window.addEventListener('online', () => { updateHeader(); syncShared(false); });
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncShared(false); });
+  window.addEventListener('online', () => { updateHeader(); syncShared(false); renderPack(); liveStart(); });
+  window.addEventListener('offline', () => { renderPack(); liveStop(); setLive('off'); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { syncShared(false); if (liveReady() && !LV.es) liveStart(); } });
   window.addEventListener('offline', updateHeader);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeSheet(); $$('.show').forEach(x => x.remove()); } });
 
@@ -1743,6 +2036,7 @@
   updateHeader();
   if (ROLE === 'admin') { const pill = document.createElement('span'); pill.className = 'pill adminpill'; pill.textContent = 'ADMIN'; $('.top-in').insertBefore(pill, $('#netpill')); }
   syncShared(false);
+  liveStart();
 
   if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) {
     window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
