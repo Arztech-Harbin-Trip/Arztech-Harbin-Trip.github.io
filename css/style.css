@@ -280,3 +280,7 @@ nav.tabs button{font-size:11px;padding:0 2px}
 .qr{display:flex;justify-content:center;margin:6px 0 10px}
 .qr svg{width:180px;height:180px;background:#fff;border-radius:10px}
 .linkbox{display:flex;gap:8px;align-items:center;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:6px 6px 6px 10px;font-size:12.5px;word-break:break-all;margin-top:6px}
+.livebar{display:flex;align-items:center;gap:8px;border-radius:12px;padding:8px 12px;margin-bottom:10px;font-size:13px;border:1px solid var(--line);background:var(--surface)}
+.livebar.on{background:var(--ok-soft);border-color:var(--ok)}
+.livebar.err{background:var(--warn-soft);border-color:var(--warn)}
+.livebar.off .btn{flex:none}
