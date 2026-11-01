@@ -1246,7 +1246,7 @@
       '<li>Sentiasa buka app dari ikon Home Screen (data disimpan di situ).</li></ol>' +
       '<p class="small muted" style="margin:6px 0 0">Status: ' + (navigator.serviceWorker && navigator.serviceWorker.controller ? '✓ App sudah disimpan untuk guna offline.' : (location.protocol === 'file:' ? 'Dibuka sebagai fail tempatan.' : 'Belum disimpan offline — muat semula halaman sekali semasa online.')) + '</p></div>';
 
-    h += '<p class="small muted" style="text-align:center">#HarbinTrip v4 · Semua harga & maklumat ialah anggaran — sahkan sebelum berlepas.</p>';
+    h += '<p class="small muted" style="text-align:center">Arztech Harbin Trip v5 · Semua harga & maklumat ialah anggaran — sahkan sebelum berlepas.</p>';
     v.innerHTML = h;
 
     const saveTrip = () => { S.trip.start = $('#tr-s').value; S.trip.end = $('#tr-e').value; save(); updateHeader(); };
@@ -1281,7 +1281,7 @@
     const a = b.dataset.a;
     if (['publish', 'pubfile', 'ghsave', 'ghclear'].includes(a)) { adminClick(a); return; }
     if (a === 'syncnow') { syncShared(true); return; }
-    if (a === 'sharelink') { navigator.share({ title: '#HarbinTrip', text: 'App #HarbinTrip — terjemahan, itinerari & bajet (boleh guna offline)', url: siteBase() }).catch(() => {}); return; }
+    if (a === 'sharelink') { navigator.share({ title: 'Arztech Harbin Trip', text: 'App Arztech Harbin Trip — terjemahan, itinerari & bajet (boleh guna offline)', url: siteBase() }).catch(() => {}); return; }
     if (a === 'savehotel') { S.hotel = hotelVals(); save(); toast('Kad hotel disimpan'); }
     else if (a === 'showhotel') {
       S.hotel = hotelVals(); save();
@@ -1569,7 +1569,7 @@
     const o = {};
     Object.keys(S.check || {}).forEach(id => { const st = S.check[id]; const x = {}; ['n', 'nt', 'q', 'p', 'pr'].forEach(k => { if (st[k] != null) x[k] = st[k]; }); if (Object.keys(x).length) o[id] = x; });
     return {
-      v: Date.now(), at: new Date().toISOString(), app: '#HarbinTrip',
+      v: Date.now(), at: new Date().toISOString(), app: 'Arztech Harbin Trip',
       announce: (S.announce || '').trim(),
       trip: inc.trip ? Object.assign({}, S.trip) : null,
       hotel: inc.trip ? Object.assign({}, S.hotel) : null,
@@ -1590,7 +1590,7 @@
     const g = await fetch(api + '?ref=' + encodeURIComponent(c.branch) + '&t=' + Date.now(), { headers: H, cache: 'no-store' });
     if (g.ok) sha = (await g.json()).sha;
     else if (g.status !== 404) throw new Error('GitHub ' + g.status + (g.status === 401 ? ' — token tidak sah / tamat tempoh' : g.status === 403 ? ' — token tiada kebenaran Contents: write' : ''));
-    const body = { message: 'Kemas kini kandungan #HarbinTrip ' + new Date(json.v).toISOString(), content: b64(JSON.stringify(json, null, 1)), branch: c.branch };
+    const body = { message: 'Kemas kini kandungan Arztech Harbin Trip ' + new Date(json.v).toISOString(), content: b64(JSON.stringify(json, null, 1)), branch: c.branch };
     if (sha) body.sha = sha;
     const p = await fetch(api, { method: 'PUT', headers: Object.assign({ 'Content-Type': 'application/json' }, H), body: JSON.stringify(body) });
     if (!p.ok) { const t = await p.json().catch(() => ({})); throw new Error('GitHub ' + p.status + ': ' + (t.message || 'gagal')); }

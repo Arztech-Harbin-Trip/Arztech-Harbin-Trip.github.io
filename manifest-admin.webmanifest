@@ -1,6 +1,6 @@
 {
-  "name": "#HarbinTrip Admin",
-  "short_name": "HarbinTrip Admin",
+  "name": "Arztech Harbin Trip — Admin",
+  "short_name": "Arztech Admin",
   "description": "Terjemahan BM–EN–中文 dengan suara, senarai persiapan & bajet, rekod kewangan. Berfungsi tanpa internet.",
   "lang": "ms",
   "start_url": "./admin.html",
