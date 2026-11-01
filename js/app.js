@@ -191,13 +191,13 @@
   }
 
   // ---------- Terjemah ayat sendiri (AI offline) ----------
-  ui.mtDir = 'out'; ui.mtText = ''; ui.pack = { out: false, back: false }; ui.dl = null; ui.mtOutHTML = '';
+  ui.mtDir = 'out'; ui.mtText = ''; ui.pack = { out: false, back: false, backms: false }; ui.dl = null; ui.mtOutHTML = '';
   const mtSup = () => (window.MT ? MT.supported() : { ok: false, why: 'Enjin terjemahan tidak dimuatkan.' });
   function mtCardHTML() {
     const back = ui.mtDir === 'back';
     return '<div class="card mtc" id="mtCard">' +
       '<div class="row" style="margin-bottom:8px"><b class="grow" style="font-size:15.5px">✍️ Terjemah ayat sendiri</b><span id="mtBadge" class="small"></span></div>' +
-      '<div class="seg" id="mtDir"><button data-dir="out" class="' + (!back ? 'on' : '') + '">BM / EN → 中文</button><button data-dir="back" class="' + (back ? 'on' : '') + '">中文 → English</button></div>' +
+      '<div class="seg" id="mtDir"><button data-dir="out" class="' + (!back ? 'on' : '') + '">BM / EN → 中文</button><button data-dir="back" class="' + (back ? 'on' : '') + '">中文 → BM / EN</button></div>' +
       (back ? '<div class="note info zh" style="font-size:15px;text-align:center"><b>请在下面输入或说出您想说的话</b><br><span class="small">(Serahkan telefon — minta dia taip / cakap dalam bahasa Cina)</span></div>' : '') +
       '<textarea class="input" id="mtIn" rows="3" placeholder="' + (back ? '在这里输入中文…' : 'Taip atau tekan 🎤. Contoh: Saya nak pergi Ice World dengan 3 orang, berapa harga tiket?') + '">' + esc(ui.mtText) + '</textarea>' +
       '<div class="row" style="margin-top:8px">' +
@@ -217,8 +217,8 @@
     renderHist();
     if (window.MT && mtSup().ok) {
       try {
-        const [a, b] = await Promise.all([MT.packStatus('out'), MT.packStatus('back')]);
-        ui.pack = { out: a, back: b };
+        const [a, b, c] = await Promise.all([MT.packStatus('out'), MT.packStatus('back'), MT.packStatus('backms')]);
+        ui.pack = { out: a, back: b, backms: c };
       } catch (e) {}
       renderPack();
     }
@@ -227,7 +227,7 @@
     const box = $('#mtHist'); if (!box) return;
     const H = (S.mtHist || []).filter(x => x.dir === ui.mtDir);
     box.innerHTML = H.length ? '<details class="pack"><summary class="small" style="cursor:pointer;font-weight:700;padding:8px 0">🕘 Terjemahan terkini (' + H.length + ')</summary>' +
-      H.map(x => '<div class="hist" data-hi="' + x.t + '"><div class="small muted">' + esc(x.src) + '</div><div class="zh" style="color:var(--red);font-weight:700">' + esc(x.dir === 'back' ? x.en : x.zh) + '</div></div>').join('') +
+      H.map(x => '<div class="hist" data-hi="' + x.t + '"><div class="small muted">' + esc(x.src) + '</div><div class="zh" style="color:var(--red);font-weight:700">' + esc(x.dir === 'back' ? (x.ms || x.en) : x.zh) + '</div></div>').join('') +
       '<button class="btn sm ghost" data-a="clearhist" style="margin-top:6px">Padam sejarah</button></details>' : '';
   }
   const fmtMB = b => (b / 1048576).toFixed(b > 10485760 ? 0 : 1) + ' MB';
@@ -248,10 +248,10 @@
       return '<div class="row" style="padding:7px 0;border-top:1px solid var(--line)"><div class="grow"><b class="small">' + esc(P.name) + '</b><div class="small muted">' + (ui.pack[p] ? '✓ Sudah dimuat turun — berfungsi tanpa internet' : 'Belum dimuat turun · ' + P.approx) + '</div></div>' +
         (ui.pack[p] ? '<button class="btn sm ghost" data-pk="rm" data-p="' + p + '">Buang</button>' : '<button class="btn sm pri" data-pk="dl" data-p="' + p + '">⬇ Muat turun</button>') + '</div>';
     };
-    const allReady = ui.pack.out && ui.pack.back;
-    box.innerHTML = '<details class="pack"' + (!ui.pack.out ? ' open' : '') + '><summary class="small" style="cursor:pointer;font-weight:700;padding:8px 0">📦 Pakej terjemahan offline ' + (allReady ? '✓' : '(' + ((ui.pack.out ? 1 : 0) + (ui.pack.back ? 1 : 0)) + '/2)') + '</summary>' +
+    const allReady = ui.pack.out && ui.pack.back && ui.pack.backms;
+    box.innerHTML = '<details class="pack"' + (!ui.pack.out ? ' open' : '') + '><summary class="small" style="cursor:pointer;font-weight:700;padding:8px 0">📦 Pakej terjemahan offline ' + (allReady ? '✓' : '(' + ((ui.pack.out ? 1 : 0) + (ui.pack.back ? 1 : 0) + (ui.pack.backms ? 1 : 0)) + '/3)') + '</summary>' +
       (!ui.pack.out ? '<div class="small" style="margin-bottom:6px">Untuk terjemah <b>apa sahaja ayat</b> tanpa internet, muat turun pakej AI ke dalam telefon <b>sekali sahaja semasa di Malaysia (guna WiFi)</b>. Sumber pakej (Hugging Face) disekat di China, jadi buat sebelum berlepas.</div>' : '') +
-      row('out') + row('back') + '</details>';
+      row('out') + row('back') + row('backms') + '</details>';
   }
   async function dlPack(p) {
     if (!navigator.onLine) { toast('Perlukan internet (WiFi) untuk muat turun pakej'); return; }
@@ -292,10 +292,12 @@
   function resHTML(r) {
     ui.mtLast = r;
     if (r.dir === 'back') {
-      return '<div class="mt-res"><div class="small muted">中文 → English</div>' +
-        '<div class="en-big">' + esc(r.en) + '</div>' +
+      return '<div class="mt-res"><div class="small muted">中文 → ' + (r.ms ? 'Bahasa Melayu & English' : 'English') + '</div>' +
+        (r.ms ? '<div class="small muted" style="margin-top:4px">🇲🇾 Bahasa Melayu</div><div class="en-big">' + esc(r.ms) + '</div><div class="small muted" style="margin-top:8px">🇬🇧 English</div><div class="en-big" style="font-size:17px">' + esc(r.en) + '</div>'
+          : '<div class="en-big">' + esc(r.en) + '</div>' + (!ui.pack.backms && mtSup().ok ? '<div class="small muted" style="margin-top:4px">💡 Muat turun pakej “+ Bahasa Melayu” di bawah untuk dapat terjemahan BM juga.</div>' : '')) +
         '<div class="zh small" style="margin-top:6px;color:var(--red)">' + esc(r.zh) + '</div>' + (r.py ? '<div class="py small">' + esc(r.py) + '</div>' : '') +
-        '<div class="acts"><button class="btn" data-mt="sayen">🔊 English</button><button class="btn" data-mt="reply">↩ Balas</button></div></div>';
+        '<div class="acts">' + (r.ms ? '<button class="btn" data-mt="sayms">🔊 BM</button>' : '') + '<button class="btn" data-mt="sayen">🔊 EN</button><button class="btn" data-mt="reply">↩ Balas</button></div>' +
+        '<div class="small muted" style="margin-top:8px">🤖 Terjemahan mesin. Bahasa Melayu diterjemah melalui English, jadi baca kedua-duanya jika ayat kurang jelas.</div></div>';
     }
     return '<div class="mt-res"><div class="small muted">' + ({ ms: 'Bahasa Melayu', en: 'English', zh: '中文' })[r.lang] + ' → 中文 (Mandarin)</div>' +
       '<div class="zhl zh">' + esc(r.zh) + '</div>' + (r.py ? '<div class="py">' + esc(r.py) + '</div>' : '') +
@@ -338,9 +340,9 @@
     const go = $('#mtGo'); if (go) { go.disabled = true; go.textContent = '⏳…'; }
     out.innerHTML = '<div class="mt-res small muted">⏳ Sedang menterjemah… (kali pertama selepas buka app ambil masa 5–20 saat untuk memuatkan model)</div>';
     try {
-      const r = await MT.translate(text, ui.mtDir);
+      const r = await MT.translate(text, ui.mtDir, { ms: ui.pack.backms });
       ui.mtOutHTML = resHTML(r) + relatedHTML(text);
-      S.mtHist = [{ dir: r.dir, src: r.src, zh: r.zh, en: r.en, py: r.py, t: Date.now() }].concat((S.mtHist || []).filter(x => x.src !== r.src)).slice(0, 30);
+      S.mtHist = [{ dir: r.dir, src: r.src, zh: r.zh, en: r.en, ms: r.ms || '', py: r.py, t: Date.now() }].concat((S.mtHist || []).filter(x => x.src !== r.src)).slice(0, 30);
       save();
     } catch (e) {
       ui.mtOutHTML = fallbackHTML(text, '⚠ Gagal menterjemah (' + esc(e && e.message ? e.message.slice(0, 100) : 'ralat') + '). Guna kamus & frasa siap:');
@@ -484,7 +486,11 @@
     const hi = e.target.closest('[data-hi]');
     if (hi) {
       const x = (S.mtHist || []).find(h => String(h.t) === hi.dataset.hi);
-      if (x) { ui.mtLast = Object.assign({ lang: 'ms' }, x); if (x.dir === 'back') speak(x.en, 'en-US', 0.95); showCard(x.dir === 'back' ? { zh: x.en, py: x.zh, ms: '' } : { zh: x.zh, py: x.py, ms: x.src, en: x.en }); }
+      if (x) {
+        ui.mtLast = Object.assign({ lang: 'ms' }, x);
+        if (x.dir === 'back') { ui.mtOutHTML = resHTML(Object.assign({ dir: 'back', lang: 'zh' }, x)); const o = $('#mtOut'); if (o) { o.innerHTML = ui.mtOutHTML; o.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }
+        else showCard({ zh: x.zh, py: x.py, ms: x.src, en: x.en });
+      }
       return;
     }
     if (e.target.closest('[data-a="clearhist"]')) { S.mtHist = []; save(); renderHist(); return; }
@@ -496,6 +502,7 @@
       else if (a === 'slow') speak(r.zh, 'zh-CN', 0.55);
       else if (a === 'show') showCard({ zh: r.zh, py: r.py, ms: r.lang === 'ms' ? r.src : '', en: r.en || (r.lang === 'en' ? r.src : '') });
       else if (a === 'sayen') speak(r.en, 'en-US', 0.95);
+      else if (a === 'sayms') speak(r.ms, 'ms-MY', 0.95);
       else if (a === 'save') {
         S.mine = (S.mine || []).concat([{ id: uid(), ms: r.lang === 'en' ? r.src : r.src, en: r.en || '', zh: r.zh, py: r.py || '' }]);
         save(); toast('Disimpan dalam ✍️ Frasa Saya');
@@ -1246,7 +1253,7 @@
       '<li>Sentiasa buka app dari ikon Home Screen (data disimpan di situ).</li></ol>' +
       '<p class="small muted" style="margin:6px 0 0">Status: ' + (navigator.serviceWorker && navigator.serviceWorker.controller ? '✓ App sudah disimpan untuk guna offline.' : (location.protocol === 'file:' ? 'Dibuka sebagai fail tempatan.' : 'Belum disimpan offline — muat semula halaman sekali semasa online.')) + '</p></div>';
 
-    h += '<p class="small muted" style="text-align:center">Arztech Harbin Trip v5 · Semua harga & maklumat ialah anggaran — sahkan sebelum berlepas.</p>';
+    h += '<p class="small muted" style="text-align:center">Arztech Harbin Trip v6 · Semua harga & maklumat ialah anggaran — sahkan sebelum berlepas.</p>';
     v.innerHTML = h;
 
     const saveTrip = () => { S.trip.start = $('#tr-s').value; S.trip.end = $('#tr-e').value; save(); updateHeader(); };

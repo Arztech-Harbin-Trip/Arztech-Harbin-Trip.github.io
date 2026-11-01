@@ -9,11 +9,14 @@ window.MT = (function () {
   const MODELS = {
     ms2en: 'Xenova/opus-mt-mul-en',
     en2zh: 'Xenova/opus-mt-en-zh',
-    zh2en: 'Xenova/opus-mt-zh-en'
+    zh2en: 'Xenova/opus-mt-zh-en',
+    en2ms: 'Xenova/opus-mt-en-mul' // sasaran Bahasa Melayu: token >>zsm_Latn<<
   };
+  const PREFIX = { en2ms: '>>zsm_Latn<< ' };
   const PACKS = {
     out: { keys: ['ms2en', 'en2zh'], name: 'BM / English → 中文', approx: '~200 MB' },
-    back: { keys: ['zh2en'], name: '中文 → English', approx: '~80 MB' }
+    back: { keys: ['zh2en'], name: '中文 → English', approx: '~80 MB' },
+    backms: { keys: ['en2ms'], name: '+ Bahasa Melayu (untuk 中文 → BM)', approx: '~110 MB' }
   };
   const READY_KEY = 'harbin-mt-ready';
   let lib = null, libErr = null, pinyinLoaded = null;
@@ -145,7 +148,7 @@ window.MT = (function () {
     const parts = sentences(text);
     const out = [];
     for (const s of parts) {
-      const r = await p(s, { max_new_tokens: 256 });
+      const r = await p((PREFIX[key] || '') + s, { max_new_tokens: 256 });
       out.push((r && r[0] && r[0].translation_text || '').trim());
     }
     return out;
@@ -161,12 +164,14 @@ window.MT = (function () {
   }
 
   // Terjemah: dir 'out' (BM/EN → 中文) atau 'back' (中文 → EN)
-  async function translate(text, dir) {
+  async function translate(text, dir, opts) {
     text = String(text || '').trim();
     if (!text) throw new Error('Tiada teks');
     if (dir === 'back') {
       const en = (await runPipe('zh2en', text)).join(' ');
-      return { dir, src: text, lang: 'zh', en, zh: text, py: await pinyinOf(text) };
+      let ms = '';
+      if (opts && opts.ms) { try { ms = (await runPipe('en2ms', en)).join(' '); } catch (e) { ms = ''; } }
+      return { dir, src: text, lang: 'zh', en, ms, zh: text, py: await pinyinOf(text) };
     }
     const lang = detect(text);
     let en;
