@@ -20,8 +20,13 @@
   const parseYmd = s => { const p = String(s).split('-').map(Number); return new Date(p[0], p[1] - 1, p[2]); };
   const HARI = ['Ahad', 'Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat', 'Sabtu'];
   const BLN = ['Jan', 'Feb', 'Mac', 'Apr', 'Mei', 'Jun', 'Jul', 'Ogo', 'Sep', 'Okt', 'Nov', 'Dis'];
-  const fmtD = s => { const d = parseYmd(s); return HARI[d.getDay()] + ', ' + d.getDate() + ' ' + BLN[d.getMonth()] + ' ' + d.getFullYear(); };
-  const fmtDs = s => { const d = parseYmd(s); return d.getDate() + ' ' + BLN[d.getMonth()]; };
+  const HARI_EN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const BLN_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const EN = () => typeof S !== 'undefined' && S.lang === 'en';
+  const dayName = d => (EN() ? HARI_EN : HARI)[d.getDay()];
+  const monName = d => (EN() ? BLN_EN : BLN)[d.getMonth()];
+  const fmtD = s => { const d = parseYmd(s); return dayName(d) + ', ' + d.getDate() + ' ' + monName(d) + ' ' + d.getFullYear(); };
+  const fmtDs = s => { const d = parseYmd(s); return d.getDate() + ' ' + monName(d); };
   const addDays = (s, n) => { const d = parseYmd(s); d.setDate(d.getDate() + n); return ymd(d); };
   const daysBetween = (a, b) => Math.round((parseYmd(b) - parseYmd(a)) / 864e5);
   const nowHM = () => { const d = new Date(); return pad(d.getHours()) + ':' + pad(d.getMinutes()); };
@@ -32,7 +37,7 @@
   const DEF = () => ({
     v: 1, tab: 'tr', check: {}, custom: [], tx: [], rate: 1.65, favs: [], mine: [],
     hotel: { nameZh: '', nameEn: '', addr: '', phone: '' },
-    trip: { start: '', end: '' }, vrate: 0.85, limit: 0, lastCur: 'CNY', itin: [], itinHidden: [], shared: null, sharedV: 0, announce: ''
+    trip: { start: '', end: '' }, vrate: 0.85, limit: 0, lastCur: 'CNY', itin: [], itinHidden: [], shared: null, sharedV: 0, announce: '', lang: 'ms'
   });
   let S = DEF();
   try {
@@ -244,7 +249,7 @@
     return '<div class="card mtc" id="mtCard">' +
       '<div class="row" style="margin-bottom:8px"><b class="grow" style="font-size:15.5px">✍️ Terjemah ayat sendiri</b><span id="mtBadge" class="small"></span></div>' +
       '<div class="seg" id="mtDir"><button data-dir="out" class="' + (!back ? 'on' : '') + '">BM / EN → 中文</button><button data-dir="back" class="' + (back ? 'on' : '') + '">中文 → BM / EN</button></div>' +
-      (back ? '<div class="note info zh" style="font-size:15px;text-align:center"><b>请在下面输入或说出您想说的话</b><br><span class="small">(Serahkan telefon — minta dia taip / cakap dalam bahasa Cina)</span></div>' : '') +
+      (back ? '<div class="note info" style="font-size:15px;text-align:center"><b class="zh">请在下面输入或说出您想说的话</b><br><span class="small">(Serahkan telefon — minta dia taip / cakap dalam bahasa Cina)</span></div>' : '') +
       '<textarea class="input" id="mtIn" rows="3" placeholder="' + (back ? '在这里输入中文…' : 'Taip atau tekan 🎤. Contoh: Saya nak pergi Ice World dengan 3 orang, berapa harga tiket?') + '">' + esc(ui.mtText) + '</textarea>' +
       '<div class="row" style="margin-top:8px">' +
       '<button class="icon-btn" id="mtMic" title="Cakap">🎤</button>' +
@@ -468,8 +473,10 @@
   }
   function phCard(p) {
     const fav = (S.favs || []).includes(p.id);
+    const mine = p.cat === 'mine' || p.cat === 'org';
+    const top = EN() && p.en ? p.en : p.ms, sub = EN() && p.en ? (mine ? p.ms : '') : p.en;
     return '<div class="ph" data-pid="' + esc(p.id) + '">' +
-      '<div class="ms">' + esc(p.ms) + '</div>' + (p.en ? '<div class="en">' + esc(p.en) + '</div>' : '') +
+      '<div class="ms" translate="no">' + esc(top) + '</div>' + (sub ? '<div class="en" translate="no">' + esc(sub) + '</div>' : '') +
       '<div class="zhl zh">' + esc(p.zh) + '</div>' + (p.py ? '<div class="py">' + esc(p.py) + '</div>' : '') +
       '<div class="acts"><button class="btn pri" data-a="say">🔊 Dengar</button><button class="btn" data-a="slow" title="Perlahan">🐢</button><button class="btn" data-a="show">⛶ Tunjuk</button>' +
       '<span class="grow"></span>' +
@@ -1063,7 +1070,7 @@
     const c = catOf(t);
     const sign = t.t === 'out' ? '−' : '+';
     const main = (t.cur === 'MYR' ? RM(t.amt) : CNY(t.amt));
-    return '<div class="tx" data-tid="' + t.id + '"><div class="ic">' + c[1] + '</div><div class="grow"><div class="t1">' + esc(t.note || c[2]) + '</div><div class="t2">' + esc(t.tm || '') + ' · ' + esc(c[2]) + ' · ' + esc(t.m || '') + '</div></div>' +
+    return '<div class="tx" data-tid="' + t.id + '"><div class="ic">' + c[1] + '</div><div class="grow"><div class="t1">' + (t.note ? '<span translate="no">' + esc(t.note) + '</span>' : esc(c[2])) + '</div><div class="t2">' + esc(t.tm || '') + ' · ' + esc(c[2]) + ' · ' + esc(t.m || '') + '</div></div>' +
       '<div class="amt num ' + t.t + '">' + sign + main + (t.cur === 'CNY' ? '<small>≈ ' + RM(rmEq(t)) + '</small>' : '') + '</div></div>';
   }
   function renderFn() {
@@ -1095,7 +1102,7 @@
       const days = Array.from(new Set(all.map(t => t.d))).sort().reverse();
       if (days.length) {
         h += '<div class="card"><h3>Ringkasan setiap hari</h3><table class="tb num"><thead><tr><th>Tarikh</th><th>Keluar</th><th>Masuk</th></tr></thead><tbody>' +
-          days.map(d => { const X = agg(all.filter(t => t.d === d)); return '<tr class="click' + (d === ui.fnDate ? ' sel' : '') + '" data-day="' + d + '"><td>' + fmtDs(d) + '<div class="small muted">' + HARI[parseYmd(d).getDay()] + '</div></td><td class="out">' + RM(X.outRM) + '<div class="small muted">' + splitTxt(X.outC, X.outM) + '</div></td><td class="in">' + (X.inRM ? RM(X.inRM) : '—') + (X.fxC ? '<div class="small fx">+' + CNY(X.fxC) + ' tukar</div>' : '') + '</td></tr>'; }).join('') +
+          days.map(d => { const X = agg(all.filter(t => t.d === d)); return '<tr class="click' + (d === ui.fnDate ? ' sel' : '') + '" data-day="' + d + '"><td>' + fmtDs(d) + '<div class="small muted">' + dayName(parseYmd(d)) + '</div></td><td class="out">' + RM(X.outRM) + '<div class="small muted">' + splitTxt(X.outC, X.outM) + '</div></td><td class="in">' + (X.inRM ? RM(X.inRM) : '—') + (X.fxC ? '<div class="small fx">+' + CNY(X.fxC) + ' tukar</div>' : '') + '</td></tr>'; }).join('') +
           '</tbody><tfoot><tr><td>Jumlah</td><td class="out">' + RM(A.outRM) + '</td><td class="in">' + RM(A.inRM) + '</td></tr></tfoot></table>' +
           (days.length ? '<p class="small muted" style="margin:8px 0 0">Purata keluar sehari: <b>' + RM(A.outRM / days.length) + '</b> (' + days.length + ' hari berekod)</p>' : '') + '</div>';
       }
@@ -1404,7 +1411,7 @@
       '<li>Sentiasa buka app dari ikon Home Screen (data disimpan di situ).</li></ol>' +
       '<p class="small muted" style="margin:6px 0 0">Status: ' + (navigator.serviceWorker && navigator.serviceWorker.controller ? '✓ App sudah disimpan untuk guna offline.' : (location.protocol === 'file:' ? 'Dibuka sebagai fail tempatan.' : 'Belum disimpan offline — muat semula halaman sekali semasa online.')) + '</p></div>';
 
-    h += '<p class="small muted" style="text-align:center">Arztech Harbin Trip v10.2 · Semua harga & maklumat ialah anggaran — sahkan sebelum berlepas.</p>';
+    h += '<p class="small muted" style="text-align:center">Arztech Harbin Trip v11 · Semua harga & maklumat ialah anggaran — sahkan sebelum berlepas.</p>';
     v.innerHTML = h;
 
     const saveTrip = () => { S.trip.start = $('#tr-s').value; S.trip.end = $('#tr-e').value; save(); updateHeader(); };
@@ -1514,10 +1521,10 @@
     return '<div class="iti' + (x.done ? ' done' : '') + (nxt ? ' next' : '') + '" data-itid="' + x.id + '">' + (nxt ? '<span class="nexttag">SETERUSNYA</span>' : '') +
       '<div class="tm">' + (x.t1 ? '<b class="num">' + esc(x.t1) + '</b>' : '<b class="muted">—</b>') + (x.t2 ? '<span class="num">hingga ' + esc(x.t2) + '</span>' : '') + '<span class="ic">' + T[1] + '</span></div>' +
       '<div class="grow">' +
-      '<div class="ti">' + esc(x.title || T[2]) + (x.off ? ' <span class="badge ' + (x.mod ? 'b-P' : 'b-D') + '">' + (x.mod ? 'Rasmi · diubah' : '📢 Rasmi') + '</span>' : '') + '</div>' +
-      (x.loc || x.locZh ? '<div class="lc">📍 ' + esc(x.loc || '') + (x.locZh ? ' <span class="zh">' + esc(x.locZh) + '</span>' : '') + '</div>' : '') +
-      (x.detail ? '<div class="dt">' + esc(x.detail) + '</div>' : '') +
-      (x.remark ? '<div class="rm">📝 ' + esc(x.remark) + '</div>' : '') +
+      '<div class="ti"><span translate="no">' + esc(x.title || '') + '</span>' + (x.title ? '' : esc(T[2])) + (x.off ? ' <span class="badge ' + (x.mod ? 'b-P' : 'b-D') + '">' + (x.mod ? 'Rasmi · diubah' : '📢 Rasmi') + '</span>' : '') + '</div>' +
+      (x.loc || x.locZh ? '<div class="lc">📍 <span translate="no">' + esc(x.loc || '') + '</span>' + (x.locZh ? ' <span class="zh">' + esc(x.locZh) + '</span>' : '') + '</div>' : '') +
+      (x.detail ? '<div class="dt" translate="no">' + esc(x.detail) + '</div>' : '') +
+      (x.remark ? '<div class="rm">📝 <span translate="no">' + esc(x.remark) + '</span></div>' : '') +
       (meta.length ? '<div class="meta">' + meta.join('') + '</div>' : '') +
       '<div class="acts"><button class="btn" data-ia="done">' + (x.done ? '↺ Belum' : '✓ Selesai') + '</button>' +
       (x.locZh ? '<button class="btn" data-ia="taxi">🚕 Pemandu</button>' : '') +
@@ -1682,7 +1689,8 @@
     const D = n => addDays(S.trip.start, n);
     const last = S.trip.end || D(5);
     const nDays = daysBetween(S.trip.start, last) + 1;
-    const mk = (d, t1, t2, type, title, loc, locZh, detail, remark) => ({ id: uid(), d, t1, t2, type, title, loc, locZh, detail: detail || '', remark: remark || '', ref: '', phone: '', cost: '', cur: 'CNY', done: false });
+    const T_ = x => (EN() && window.I18N ? I18N.tr(x || '') : (x || ''));
+    const mk = (d, t1, t2, type, title, loc, locZh, detail, remark) => ({ id: uid(), d, t1, t2, type, title: T_(title), loc, locZh, detail: T_(detail), remark: T_(remark), ref: '', phone: '', cost: '', cur: 'CNY', done: false });
     const L = [
       mk(D(0), '', '', 'flight', 'Tiba di Harbin', 'Harbin Taiping International Airport', '哈尔滨太平国际机场', 'Ambil bagasi, aktifkan roaming/eSIM, pakai jaket sebelum keluar terminal.', 'Isi waktu & no. penerbangan.'),
       mk(D(0), '', '', 'hotel', 'Daftar masuk hotel', S.hotel.nameEn || 'Hotel', S.hotel.nameZh || '', 'Simpan bagasi, rehat.', ''),
@@ -1823,7 +1831,7 @@
   }
   function annHTML() {
     const a = ROLE === 'admin' ? (S.announce || '').trim() : ((S.shared && S.shared.announce) || '').trim();
-    return a ? '<div class="note ann"><b>📢 Pengumuman' + (ROLE === 'admin' ? ' (pratonton — diterbitkan kepada pengguna)' : ' daripada penganjur') + '</b><br>' + esc(a).replace(/\n/g, '<br>') + '</div>' : '';
+    return a ? '<div class="note ann"><b>📢 Pengumuman' + (ROLE === 'admin' ? ' (pratonton — diterbitkan kepada pengguna)' : ' daripada penganjur') + '</b><br><span translate="no">' + esc(a).replace(/\n/g, '<br>') + '</span></div>' : '';
   }
   function qrSVG(text) {
     try { const q = window.qrcode(0, 'M'); q.addData(text); q.make(); return q.createSvgTag({ cellSize: 5, margin: 2, scalable: true }); } catch (e) { return ''; }
@@ -2157,6 +2165,17 @@
   if (!RENDER[S.tab]) S.tab = 'tr';
   setTab(S.tab);
   updateHeader();
+  // Butang bahasa BM ⇄ EN
+  (function () {
+    const lb = document.createElement('button');
+    lb.className = 'pill langbtn'; lb.type = 'button';
+    lb.textContent = EN() ? '🌐 BM' : '🌐 EN';
+    lb.title = EN() ? 'Tukar ke Bahasa Melayu' : 'Switch to English';
+    lb.setAttribute('translate', 'no');
+    lb.onclick = () => { S.lang = EN() ? 'ms' : 'en'; save(); location.reload(); };
+    $('.top-in').insertBefore(lb, $('#netpill'));
+  })();
+  if (EN() && window.I18N) I18N.start();
   if (ROLE === 'admin') { const pill = document.createElement('span'); pill.className = 'pill adminpill'; pill.textContent = 'ADMIN'; $('.top-in').insertBefore(pill, $('#netpill')); }
   syncShared(false);
   liveStart();
