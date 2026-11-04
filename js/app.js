@@ -112,22 +112,68 @@
   function loadVoices() { try { voices = window.speechSynthesis ? speechSynthesis.getVoices() : []; } catch (e) { voices = []; } }
   loadVoices();
   if (window.speechSynthesis) speechSynthesis.onvoiceschanged = () => { loadVoices(); if (S.tab === 'tr') renderTrNote(); if (S.tab === 'in') renderIn(); };
-  function zhVoice() {
-    return voices.find(v => /zh[-_]CN/i.test(v.lang)) || voices.find(v => /cmn/i.test(v.lang)) || voices.find(v => /^zh/i.test(v.lang) && !/HK|TW/i.test(v.lang)) || voices.find(v => /^zh/i.test(v.lang));
+  // Pilih suara: utamakan suara yang TERSIMPAN dalam peranti (localService) — suara "online" (cth. "Google 普通话") diam bila tiada internet
+  const isZh = v => /^(zh|cmn)/i.test(v.lang || '') && !/HK|TW|yue/i.test(v.lang || '');
+  function voicesFor(lang) {
+    const L = (lang || '').toLowerCase().slice(0, 2);
+    const list = lang.startsWith('zh') ? voices.filter(isZh).concat(voices.filter(v => /^zh/i.test(v.lang || '') && !isZh(v))) : voices.filter(v => (v.lang || '').toLowerCase().startsWith(L));
+    return { local: list.filter(v => v.localService), online: list.filter(v => !v.localService) };
   }
+  function pickVoice(lang) {
+    const { local, online } = voicesFor(lang);
+    // Ada internet: suara online (biasanya lebih jelas) atau tempatan. Tiada internet: tempatan SAHAJA.
+    if (!navigator.onLine) return local[0] || null;
+    return online[0] || local[0] || null;
+  }
+  function zhVoice() { return pickVoice('zh-CN'); }
+  function zhLocalVoice() { return voicesFor('zh-CN').local[0] || null; }
+  const devKind = () => /iPhone|iPad|iPod/.test(navigator.userAgent) ? 'ios' : /Android/.test(navigator.userAgent) ? 'android' : /Windows/.test(navigator.userAgent) ? 'windows' : /Mac OS/.test(navigator.userAgent) ? 'mac' : 'other';
+  function voiceHowTo() {
+    const k = devKind();
+    const T = {
+      ios: '<b>iPhone:</b> Settings → Accessibility → <b>Spoken Content</b> → Voices → <b>Chinese (China mainland)</b> → pilih suara (cth. Tingting / Lili) → muat turun.',
+      android: '<b>Android:</b> Settings → System → Languages → <b>Text-to-speech output</b> → enjin <b>Speech Services by Google</b> → ⚙ → <b>Install voice data</b> → <b>Chinese (Mandarin)</b> → muat turun. (Samsung: Settings → General management → Text-to-speech.) Kemudian tutup & buka semula app.',
+      windows: '<b>Windows:</b> Settings → Time & language → <b>Speech</b> → Add voices → <b>Chinese (Simplified, China)</b> → Add. Kemudian tutup semua tetingkap Chrome & buka semula.',
+      mac: '<b>Mac:</b> System Settings → Accessibility → <b>Spoken Content</b> → System voice → Manage Voices → Chinese (China mainland) → muat turun.',
+      other: 'Pasang suara Bahasa Cina (Mandarin) dalam tetapan text-to-speech peranti.'
+    };
+    return T[k];
+  }
+  function voiceMissingSheet() {
+    sheet('<h2>🔇 Suara Cina offline belum dipasang</h2>' +
+      '<p style="margin-top:0">Suara Bahasa Cina yang ada dalam ' + (devKind() === 'windows' || devKind() === 'mac' ? 'komputer' : 'telefon') + ' ini ialah suara <b>online</b> — ia hanya berbunyi bila ada internet. Untuk berbunyi tanpa internet (di China), pasang suara yang disimpan dalam peranti:</p>' +
+      '<div class="note info small">' + voiceHowTo() + '</div>' +
+      '<p class="small muted">Buat semasa ada internet. Sementara itu, tekan <b>⛶ Tunjuk</b> untuk paparkan teks Cina besar kepada orang tempatan.</p>' +
+      '<button class="btn pri block" id="vm-ok">Faham</button>', sh => { $('#vm-ok', sh).onclick = closeSheet; });
+  }
+  let speakWarned = 0;
   function speak(text, lang, rate) {
     if (!('speechSynthesis' in window)) { toast('Peranti ini tidak menyokong suara'); return; }
     lang = lang || 'zh-CN';
     const clean = String(text).replace(/……|…/g, '，').replace(/\s*\/\s*/g, '，');
+    loadVoices();
+    const v = pickVoice(lang);
+    if (lang.startsWith('zh') && voices.length && !v) {
+      // Offline & hanya ada suara online / tiada suara langsung
+      if (!navigator.onLine && voicesFor(lang).online.length) { voiceMissingSheet(); return; }
+      if (!voicesFor(lang).online.length && Date.now() - speakWarned > 20000) { speakWarned = Date.now(); voiceMissingSheet(); return; }
+    }
     try {
       speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(clean);
       u.lang = lang;
-      const v = lang.startsWith('zh') ? zhVoice() : voices.find(x => x.lang && x.lang.toLowerCase().startsWith(lang.slice(0, 2)));
       if (v) u.voice = v;
       u.rate = rate || S.vrate || 0.85;
+      let started = false;
+      u.onstart = () => { started = true; };
+      u.onerror = e => {
+        if (e && (e.error === 'interrupted' || e.error === 'canceled')) return;
+        if (lang.startsWith('zh') && (!navigator.onLine || (v && !v.localService))) voiceMissingSheet();
+        else toast('Suara gagal dimainkan' + (e && e.error ? ' (' + e.error + ')' : ''));
+      };
       speechSynthesis.speak(u);
-      if (lang.startsWith('zh') && voices.length && !zhVoice()) toast('Tiada suara Cina dalam telefon — lihat Info → Suara');
+      // Chrome kadang-kadang "senyap" tanpa ralat bila suara online tiada internet
+      setTimeout(() => { if (!started && !speechSynthesis.speaking && lang.startsWith('zh') && !navigator.onLine) voiceMissingSheet(); }, 2500);
     } catch (e) { toast('Gagal mainkan suara'); }
   }
 
@@ -417,7 +463,7 @@
     if (!n) return;
     let h = '';
     if (!('speechSynthesis' in window)) h = '<div class="note">Pelayar ini tidak menyokong suara. Teks Cina dan butang ⛶ Tunjuk masih boleh digunakan.</div>';
-    else if (voices.length && !zhVoice()) h = '<div class="note">🔇 Suara Bahasa Cina belum dipasang dalam telefon ini. Lihat <b>Info → Suara</b> untuk cara muat turun (buat sebelum berlepas).</div>';
+    else if (voices.length && !zhLocalVoice()) h = '<div class="note small">🔇 Suara Cina <b>offline</b> belum dipasang — butang 🔊 hanya berbunyi bila ada internet. Lihat <b>Info → 🔊 Suara</b> (buat sebelum berlepas).</div>';
     n.innerHTML = h;
   }
   function phCard(p) {
@@ -1326,11 +1372,14 @@
       '</ul></div>';
 
     h += '<div class="card"><h3>🔊 Suara (text-to-speech)</h3>' +
-      '<div class="note ' + (zv ? 'info' : '') + '">' + (!('speechSynthesis' in window) ? 'Pelayar ini tidak menyokong suara.' : (zv ? '✓ Suara Cina dijumpai: <b>' + esc(zv.name) + '</b> (' + esc(zv.lang) + ')' : (voices.length ? '✗ Tiada suara Bahasa Cina dalam telefon ini. Ikut langkah di bawah.' : 'Menyemak suara… tekan Uji suara.'))) + '</div>' +
+      (() => { if (!('speechSynthesis' in window)) return '<div class="note">Pelayar ini tidak menyokong suara.</div>';
+        const vl = voicesFor('zh-CN');
+        if (!voices.length) return '<div class="note">Menyemak suara… tekan Uji suara.</div>';
+        return '<div class="note ' + (vl.local.length ? 'info' : '') + ' small">' +
+          (vl.local.length ? '✅ <b>Suara offline:</b> ' + esc(vl.local[0].name) + ' — berbunyi walaupun tanpa internet.' : '⚠️ <b>Tiada suara Cina offline.</b> ' + (vl.online.length ? 'Yang ada hanya suara online (' + esc(vl.online[0].name) + ') — senyap bila tiada internet.' : 'Tiada suara Cina langsung.') + '<br>' + voiceHowTo()) +
+          '</div>'; })() +
       '<label class="field"><span>Kelajuan suara: <b id="vr-l">' + (+S.vrate).toFixed(2) + '×</b></span><input type="range" id="vr" min="0.5" max="1.1" step="0.05" value="' + S.vrate + '" style="width:100%"></label>' +
       '<button class="btn block" data-a="testv">▶ Uji suara: 您好，我来自马来西亚</button>' +
-      '<p class="small" style="margin:12px 0 4px"><b>iPhone:</b> Settings → Accessibility → Spoken Content → Voices → Chinese (China mainland) → muat turun suara (contoh Tingting / Lili).</p>' +
-      '<p class="small" style="margin:0 0 4px"><b>Android:</b> Settings → Languages → Text-to-speech output → enjin Google → Install voice data → Chinese (Mandarin) → muat turun.</p>' +
       '<p class="small muted" style="margin:0">Buat semasa ada internet di Malaysia. Selepas dimuat turun, suara berfungsi tanpa internet.</p></div>';
 
     h += '<div class="card"><h3>🎤 Cakap → teks tanpa internet</h3>' +
@@ -1355,7 +1404,7 @@
       '<li>Sentiasa buka app dari ikon Home Screen (data disimpan di situ).</li></ol>' +
       '<p class="small muted" style="margin:6px 0 0">Status: ' + (navigator.serviceWorker && navigator.serviceWorker.controller ? '✓ App sudah disimpan untuk guna offline.' : (location.protocol === 'file:' ? 'Dibuka sebagai fail tempatan.' : 'Belum disimpan offline — muat semula halaman sekali semasa online.')) + '</p></div>';
 
-    h += '<p class="small muted" style="text-align:center">Arztech Harbin Trip v10 · Semua harga & maklumat ialah anggaran — sahkan sebelum berlepas.</p>';
+    h += '<p class="small muted" style="text-align:center">Arztech Harbin Trip v10.2 · Semua harga & maklumat ialah anggaran — sahkan sebelum berlepas.</p>';
     v.innerHTML = h;
 
     const saveTrip = () => { S.trip.start = $('#tr-s').value; S.trip.end = $('#tr-e').value; save(); updateHeader(); };
@@ -1394,12 +1443,22 @@
     if (a === 'lvoff') { liveCfg().on = false; save(); liveStop(); renderIn(); return; }
     if (a === 'lvsave') {
       const c = liveCfg();
-      const db = normDb($('#lv-db').value), code = normCode($('#lv-code').value), name = $('#lv-name').value.trim();
-      if (!/^https:\/\/[^/]+\.(firebasedatabase\.app|firebaseio\.com)$/.test(db)) { toast('Alamat Firebase tidak sah — salin dari tab Data (…firebasedatabase.app)'); return; }
+      const raw = $('#lv-db').value, code = normCode($('#lv-code').value), name = $('#lv-name').value.trim();
+      if (!raw.trim()) { toast('Tampal alamat Firebase dahulu'); return; }
       if (code.length < 8) { toast('Kod kumpulan sekurang-kurangnya 8 aksara'); return; }
       if (!name) { toast('Isi nama anda'); return; }
-      c.db = db; c.code = code; c.on = true; S.myName = name; save(); liveStart(); renderIn();
-      toast('✅ Itinerari bersama aktif. Tekan 🚀 Terbitkan supaya pengguna dapat alamat pangkalan data.');
+      if (!navigator.onLine) { toast('Perlukan internet untuk aktifkan'); return; }
+      b.disabled = true; b.textContent = '⏳ Menyemak sambungan…';
+      (async () => {
+        const db = await resolveDb(raw);
+        if (!db) { b.disabled = false; b.textContent = '▶ Aktifkan itinerari bersama'; liveProblemSheet({ why: 'addr', msg: 'Alamat yang ditampal: ' + raw.trim().slice(0, 120) }); return; }
+        const prev = { db: c.db, code: c.code, on: c.on };
+        c.db = db; c.code = code; c.on = true; S.myName = name;
+        const res = await liveCheck();
+        if (!res.ok) { Object.assign(c, prev); save(); renderIn(); liveProblemSheet(res); return; }
+        save(); liveStart(); renderIn();
+        toast('✅ Sambungan berjaya — itinerari bersama aktif! Tekan 🚀 Terbitkan supaya pengguna dapat alamat database.');
+      })();
       return;
     }
     if (a === 'syncnow') { syncShared(true); return; }
@@ -1950,6 +2009,52 @@
   async function liveRefetch() {
     try { const r = await fetch(liveBase() + '/items.json', { cache: 'no-store' }); if (r.ok) liveMerge((await r.json()) || {}, false); } catch (e) {}
   }
+  // Terima apa-apa bentuk alamat: alamat database, tanpa https, atau link console Firebase dari bar pelayar
+  async function resolveDb(input) {
+    const t = String(input || '').trim();
+    const m = t.match(/([a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:firebasedatabase\.app|firebaseio\.com))/i);
+    if (m) return 'https://' + m[1].toLowerCase();
+    if (/^https?:\/\/localhost(:\d+)?\/?$/i.test(t)) return t.replace(/\/+$/, ''); // ujian
+    const n = (t.match(/\/database\/([a-z0-9-]+)/i) || t.match(/^([a-z0-9-]+-default-rtdb)$/i) || [])[1];
+    if (!n) return '';
+    const cands = ['https://' + n + '.asia-southeast1.firebasedatabase.app', 'https://' + n + '.firebaseio.com', 'https://' + n + '.europe-west1.firebasedatabase.app'];
+    for (const c of cands) {
+      try {
+        const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 6000);
+        const r = await fetch(c + '/.json?shallow=true', { signal: ctl.signal, cache: 'no-store' }); clearTimeout(tm);
+        if (r.status === 200 || r.status === 401 || r.status === 403) return c;
+      } catch (e) {}
+    }
+    return '';
+  }
+  // Uji sambungan sebenar ke /g/<kod>/items — sahkan alamat & Rules
+  async function liveCheck() {
+    try {
+      const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 9000);
+      const r = await fetch(liveBase() + '/items.json?shallow=true', { signal: ctl.signal, cache: 'no-store' }); clearTimeout(tm);
+      if (r.ok) return { ok: true };
+      let msg = ''; try { msg = (await r.json()).error || ''; } catch (e) {}
+      if (r.status === 401 || r.status === 403) return { ok: false, why: 'rules', msg };
+      if (r.status === 404) return { ok: false, why: 'addr', msg };
+      if (r.status === 423) return { ok: false, why: 'disabled', msg };
+      return { ok: false, why: 'http', msg: 'HTTP ' + r.status + (msg ? ' — ' + msg : '') };
+    } catch (e) { return { ok: false, why: 'net', msg: e && e.name === 'AbortError' ? 'tamat masa' : (e && e.message) || '' }; }
+  }
+  function liveProblemSheet(res) {
+    const T = {
+      rules: ['🔒 Firebase menolak akses (Rules)', 'Database dijumpai, tetapi <b>Rules</b> belum dipasang dengan betul. Dalam Firebase: Realtime Database → tab <b>Rules</b> → padam semua → tampal peraturan di bawah → tekan <b>Publish</b>. Kemudian tekan Aktifkan sekali lagi.', true],
+      addr: ['❓ Database tidak dijumpai', 'Alamat tidak betul atau database belum dicipta. Dalam Firebase: <b>Realtime Database</b> → tab <b>Data</b> → salin alamat yang berakhir <b>.firebasedatabase.app</b> (atau .firebaseio.com).', false],
+      disabled: ['⛔ Database dimatikan', 'Database ini dinyahaktifkan dalam Firebase. Semak Realtime Database dalam console.', false],
+      net: ['📡 Tidak dapat hubungi Firebase', 'Semak sambungan internet. Jika guna WiFi/SIM China, Firebase disekat — guna roaming/eSIM Malaysia. Pastikan juga alamat betul.', false],
+      http: ['⚠ Ralat Firebase', 'Firebase membalas ralat.', false]
+    }[res.why] || ['⚠ Ralat', '', false];
+    sheet('<h2>' + T[0] + '</h2><p style="margin-top:0">' + T[1] + '</p>' + (res.msg ? '<div class="small muted">Butiran: ' + esc(res.msg) + '</div>' : '') +
+      (T[2] ? '<textarea class="input" readonly rows="8" style="font-family:monospace;font-size:12px;margin-top:8px">' + esc(FB_RULES) + '</textarea><button class="btn block" id="lp-copy" style="margin-top:8px">📋 Salin peraturan</button>' : '') +
+      '<div style="height:8px"></div><button class="btn pri block" id="lp-ok">Faham</button>', sh => {
+        if ($('#lp-copy', sh)) $('#lp-copy', sh).onclick = () => copyText(FB_RULES);
+        $('#lp-ok', sh).onclick = closeSheet;
+      });
+  }
   function liveJoinSheet(prefill) {
     const c = liveCfg();
     sheet('<h2>🔄 Itinerari bersama</h2>' +
@@ -1960,14 +2065,19 @@
       '<button class="btn pri block" id="lj-go">' + (c.on ? 'Simpan' : 'Sertai') + '</button>' +
       (c.on ? '<div style="height:8px"></div><button class="btn block" id="lj-off">Berhenti kongsi (itinerari kekal dalam telefon)</button>' : ''),
       sh => {
-        $('#lj-go', sh).onclick = () => {
+        $('#lj-go', sh).onclick = async () => {
           const code = normCode($('#lj-code', sh).value), name = $('#lj-name', sh).value.trim();
           const dbEl = $('#lj-db', sh);
-          if (dbEl && dbEl.value.trim()) c.db = normDb(dbEl.value);
           if (code.length < 8) { toast('Kod kumpulan tidak sah (sekurang-kurangnya 8 aksara)'); return; }
-          if (!liveDb()) { toast('Alamat pangkalan data belum ada — minta daripada penganjur'); return; }
           if (!name) { toast('Isi nama anda'); return; }
-          S.myName = name; c.code = code; c.on = true; save(); closeSheet();
+          if (dbEl && dbEl.value.trim()) { const d = await resolveDb(dbEl.value); if (!d) { toast('Alamat database tidak sah — minta link jemputan daripada penganjur'); return; } c.db = d; }
+          if (!liveDb()) { toast('Alamat database belum ada — buka link jemputan daripada penganjur, atau minta penganjur tekan 🚀 Terbitkan'); return; }
+          const btn = $('#lj-go', sh); btn.disabled = true; btn.textContent = '⏳ Menyemak…';
+          const prev = { code: c.code, on: c.on };
+          S.myName = name; c.code = code; c.on = true;
+          const res = navigator.onLine ? await liveCheck() : { ok: true };
+          if (!res.ok) { Object.assign(c, prev); save(); btn.disabled = false; btn.textContent = 'Sertai'; liveProblemSheet(res); return; }
+          save(); closeSheet();
           liveStart(); renderAll(); toast('✅ Itinerari bersama aktif');
         };
         if ($('#lj-off', sh)) $('#lj-off', sh).onclick = () => { c.on = false; save(); liveStop(); closeSheet(); renderAll(); };
