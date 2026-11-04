@@ -1,5 +1,5 @@
 /* Service worker: simpan semua fail app supaya boleh dibuka tanpa internet. */
-const CACHE = 'harbin-trip-v10';
+const CACHE = 'harbin-trip-v10c';
 const ASSETS = [
   './', 'index.html', 'admin.html', 'manifest-admin.webmanifest', 'vendor/qrcode.js', 'css/style.css', 'js/app.js', 'js/mt.js', 'js/data-phrases.js', 'js/data-checklist.js', 'js/data-glossary.js',
   'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'
