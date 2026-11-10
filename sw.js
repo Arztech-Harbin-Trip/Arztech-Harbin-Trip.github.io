@@ -1,11 +1,11 @@
 /* Service worker: simpan semua fail app supaya boleh dibuka tanpa internet. */
-const CACHE = 'harbin-trip-v11';
+const CACHE = 'harbin-trip-v12b';
 const ASSETS = [
   './', 'index.html', 'admin.html', 'manifest-admin.webmanifest', 'vendor/qrcode.js', 'css/style.css', 'js/app.js', 'js/mt.js', 'js/i18n.js', 'js/data-phrases.js', 'js/data-checklist.js', 'js/data-glossary.js',
   'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'
 ];
 // Fail enjin terjemahan (besar) — disimpan bila pakej terjemahan dimuat turun
-const LAZY = ['vendor/transformers.min.js', 'vendor/ort-wasm-simd-threaded.jsep.mjs', 'vendor/ort-wasm-simd-threaded.jsep.wasm', 'vendor/pinyin-pro.js'];
+const LAZY = ['vendor/transformers.min.js', 'vendor/ort-wasm-simd-threaded.jsep.mjs', 'vendor/ort-wasm-simd-threaded.jsep.wasm', 'vendor/pinyin-pro.js', 'vendor/pdf.min.js', 'vendor/pdf.worker.min.js'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
 });
@@ -33,6 +33,7 @@ self.addEventListener('fetch', e => {
     }).catch(() => caches.match(new Request(url.pathname)).then(h => h || new Response('{"v":0}', { headers: { 'Content-Type': 'application/json' } }))));
     return;
   }
+  if (url.pathname.indexOf('/files/') >= 0) return; // PDF & gambar besar: terus dari rangkaian
   const isVendor = url.pathname.indexOf('/vendor/') >= 0;
   e.respondWith(
     caches.match(e.request, { ignoreSearch: true }).then(hit => {

@@ -37,7 +37,7 @@
   const DEF = () => ({
     v: 1, tab: 'tr', check: {}, custom: [], tx: [], rate: 1.65, favs: [], mine: [],
     hotel: { nameZh: '', nameEn: '', addr: '', phone: '' },
-    trip: { start: '', end: '' }, vrate: 0.85, limit: 0, lastCur: 'CNY', itin: [], itinHidden: [], shared: null, sharedV: 0, announce: '', lang: 'ms'
+    trip: { start: '', end: '' }, vrate: 0.85, limit: 0, lastCur: 'CNY', itin: [], itinHidden: [], shared: null, sharedV: 0, announce: '', lang: 'ms', pdf: null, pdfSkip: 0
   });
   let S = DEF();
   try {
@@ -705,11 +705,16 @@
   // 2) PERSIAPAN (CHECKLIST + BAJET)
   // =====================================================================
   const PRI = { W: 'Wajib', D: 'Disyorkan', P: 'Pilihan' };
-  function catsWithItems() {
+  function isRemoved(id) {
+    const st = S.check[id] || {}, so = (S.shared && S.shared.ck && S.shared.ck.o && S.shared.ck.o[id]) || {};
+    return st.rm === true || (st.rm !== false && so.rm === true);
+  }
+  function catsWithItems(withRemoved) {
     return (window.CHECKLIST || []).map(c => {
       const items = c.items.map(r => ({ id: r[0], name: r[1], note: r[2], qty: r[3], price: r[4], pri: r[5], custom: false }))
         .concat(((S.shared && S.shared.ck && S.shared.ck.c) || []).filter(x => x.cat === c.id).map(x => Object.assign({}, x, { custom: false, shared: true })))
-        .concat((S.custom || []).filter(x => x.cat === c.id).map(x => Object.assign({ custom: true }, x)));
+        .concat((S.custom || []).filter(x => x.cat === c.id).map(x => Object.assign({ custom: true }, x)))
+        .filter(x => withRemoved || !isRemoved(x.id));
       return Object.assign({}, c, { items });
     });
   }
@@ -782,6 +787,15 @@
       (e.s === 'have' ? '<span class="small muted">—</span>' : '<label class="bin"><span>RM</span><input class="num" data-bin="' + esc(e.id) + '" inputmode="decimal" value="' + (+(+val).toFixed(2)) + '" aria-label="Harga"></label>') +
       '</div>';
   }
+  function removedCardHTML() {
+    const rows = [];
+    catsWithItems(true).forEach(c => c.items.forEach(it => { if (isRemoved(it.id)) rows.push([c, eff(it)]); }));
+    if (!rows.length) return '';
+    return '<details class="card"><summary style="cursor:pointer;font-weight:700">↩ Barang yang dibuang (' + rows.length + ')</summary>' +
+      '<p class="small muted" style="margin:6px 0 0">Barang ini tidak dikira dalam bajet. Tekan Pulihkan untuk letak semula.</p>' +
+      rows.map(r => '<div class="row" style="padding:8px 0;border-top:1px solid var(--line)" data-rid="' + esc(r[1].id) + '"><div class="grow small"><b>' + esc(r[1].name) + '</b><div class="muted">' + r[0].icon + ' ' + esc(r[0].name) + '</div></div><button class="btn sm" data-a="restore">Pulihkan</button></div>').join('') +
+      '<button class="btn sm block" data-a="restoreall" style="margin-top:8px">Pulihkan semua</button></details>';
+  }
   function renderCk() {
     const v = $('#v-ck');
     const T = totals();
@@ -804,7 +818,7 @@
             return '<div class="it ' + e.s + '" data-iid="' + esc(e.id) + '"><button class="ck" data-a="ck" aria-label="Tanda">' + (e.s === 'bought' ? '✓' : e.s === 'have' ? '✓' : '') + '</button>' +
               '<div class="grow"><div class="nm">' + esc(e.name) + ' <span class="badge b-' + e.pri + '">' + PRI[e.pri] + '</span></div>' +
               (e.note ? '<div class="nt">' + esc(e.note) + '</div>' : '') + '<button class="pr num prbtn" data-a="edit">' + pr + ' <span class="edhint">✎ ubah</span></button></div>' +
-              '<button class="ed" data-a="edit" aria-label="Ubah">✎</button></div>';
+              '<button class="ed" data-a="edit" aria-label="Ubah">✎</button><button class="ed" data-a="rmv" aria-label="Buang">🗑</button></div>';
           }).join('') +
           '<button class="add-it" data-a="add" data-cat="' + c.id + '">＋ Tambah barang</button></details>';
       });
@@ -831,6 +845,7 @@
         '<p class="small muted" style="margin:10px 0 0">Unjuran = harga sebenar yang dah dibayar + anggaran yang belum dibayar. Item “dah ada” tidak dikira. Duit RMB yang ditukar direkod dalam tab Kewangan.</p></details>' +
         '<button class="btn block" data-a="resetck">↺ Set semula semua tanda</button>';
     }
+    h += removedCardHTML();
     v.innerHTML = h;
     $$('details.cl', v).forEach(d => d.addEventListener('toggle', () => { if (d.open) ui.open.add(d.dataset.cid); else ui.open.delete(d.dataset.cid); }));
     const ar = $('#autoRec');
@@ -912,7 +927,7 @@
     }
   }
   function findItem(id) {
-    for (const c of catsWithItems()) { const it = c.items.find(x => x.id === id); if (it) return it; }
+    for (const c of catsWithItems(true)) { const it = c.items.find(x => x.id === id); if (it) return it; }
     return null;
   }
   function setCheck(id, patch) { S.check[id] = Object.assign({}, S.check[id] || {}, patch); }
@@ -954,6 +969,7 @@
       '<div class="row"><button class="btn pri grow" id="it-save">Simpan</button>' +
       (!isNew && e.custom ? '<button class="btn red" id="it-del">Padam</button>' : '') +
       (!isNew && !e.custom ? '<button class="btn" id="it-reset">Asal</button>' : '') + '</div>' +
+      (!isNew && !e.custom ? '<div style="height:8px"></div><button class="btn block" id="it-rm" style="color:var(--red)">🗑 Buang dari senarai (tak perlu)</button>' : '') +
       (!isNew && e.s === 'todo' ? '<div style="height:8px"></div><button class="btn block" id="it-have">👍 Saya dah ada barang ni (tak perlu beli)</button>' : '') +
       (!isNew && e.s === 'have' ? '<div style="height:8px"></div><button class="btn block" id="it-unhave">↺ Tandakan belum ada / perlu beli</button>' : ''),
       sh => {
@@ -988,6 +1004,7 @@
           S.custom = S.custom.filter(x => x.id !== it.id); delete S.check[it.id];
           save(); closeSheet(); renderCk();
         };
+        if ($('#it-rm', sh)) $('#it-rm', sh).onclick = () => { closeSheet(); removeItem(it.id); };
         if ($('#it-have', sh)) $('#it-have', sh).onclick = () => { setCheck(it.id, { s: 'have', a: 0, tx: undefined }); save(); closeSheet(); renderCk(); toast('Ditanda dah ada — tidak dikira dalam bajet'); };
         if ($('#it-unhave', sh)) $('#it-unhave', sh).onclick = () => { setCheck(it.id, { s: 'todo', a: undefined, tx: undefined }); save(); closeSheet(); renderCk(); };
         if ($('#it-reset', sh)) $('#it-reset', sh).onclick = () => {
@@ -997,7 +1014,31 @@
         };
       });
   }
+  function removeItem(id) {
+    const it = findItem(id); if (!it) return;
+    const e = eff(it);
+    const doIt = () => {
+      if (it.custom) {
+        const st = S.check[id] || {}; const prev = { c: S.custom.find(x => x.id === id), st: Object.assign({}, st) };
+        if (st.tx) S.tx = S.tx.filter(t => t.id !== st.tx);
+        S.custom = S.custom.filter(x => x.id !== id); delete S.check[id]; save(); renderCk();
+        toast('Barang dibuang', 'Batal', () => { S.custom.push(prev.c); if (Object.keys(prev.st).length) S.check[id] = prev.st; save(); renderCk(); });
+      } else {
+        const had = (S.check[id] || {}).rm;
+        setCheck(id, { rm: true }); save(); renderCk();
+        toast('Barang dibuang daripada senarai', 'Batal', () => { setCheck(id, { rm: had }); if (had === undefined) delete S.check[id].rm; save(); renderCk(); });
+      }
+    };
+    if (e.s === 'bought') ask('Barang ini sudah ditanda dibeli. Buang daripada senarai? (Rekod di tab Kewangan kekal.)', 'Buang', true).then(ok => ok && doIt());
+    else doIt();
+  }
   $('#v-ck').addEventListener('click', e => {
+    const rb = e.target.closest('[data-a="restore"],[data-a="restoreall"]');
+    if (rb) {
+      if (rb.dataset.a === 'restoreall') catsWithItems(true).forEach(c => c.items.forEach(it => { if (isRemoved(it.id)) setCheck(it.id, { rm: false }); }));
+      else { const rid = rb.closest('[data-rid]').dataset.rid; setCheck(rid, { rm: false }); }
+      save(); renderCk(); toast('Barang dipulihkan'); return;
+    }
     const v = e.target.closest('[data-ckv]');
     if (v) { ui.ckView = v.dataset.ckv; renderCk(); return; }
     const f = e.target.closest('[data-ckf]');
@@ -1020,6 +1061,7 @@
     const it = row && findItem(row.dataset.iid);
     if (!it) return;
     if (a === 'edit') { itemSheet(it); return; }
+    if (a === 'rmv') { removeItem(it.id); return; }
     if (a === 'bck') { budgetToggle(it.id); return; }
     if (a === 'ck') {
       const en = eff(it);
@@ -1411,7 +1453,7 @@
       '<li>Sentiasa buka app dari ikon Home Screen (data disimpan di situ).</li></ol>' +
       '<p class="small muted" style="margin:6px 0 0">Status: ' + (navigator.serviceWorker && navigator.serviceWorker.controller ? '✓ App sudah disimpan untuk guna offline.' : (location.protocol === 'file:' ? 'Dibuka sebagai fail tempatan.' : 'Belum disimpan offline — muat semula halaman sekali semasa online.')) + '</p></div>';
 
-    h += '<p class="small muted" style="text-align:center">Arztech Harbin Trip v11 · Semua harga & maklumat ialah anggaran — sahkan sebelum berlepas.</p>';
+    h += '<p class="small muted" style="text-align:center">Arztech Harbin Trip v12.1 · Semua harga & maklumat ialah anggaran — sahkan sebelum berlepas.</p>';
     v.innerHTML = h;
 
     const saveTrip = () => { S.trip.start = $('#tr-s').value; S.trip.end = $('#tr-e').value; save(); updateHeader(); };
@@ -1525,6 +1567,7 @@
       (x.loc || x.locZh ? '<div class="lc">📍 <span translate="no">' + esc(x.loc || '') + '</span>' + (x.locZh ? ' <span class="zh">' + esc(x.locZh) + '</span>' : '') + '</div>' : '') +
       (x.detail ? '<div class="dt" translate="no">' + esc(x.detail) + '</div>' : '') +
       (x.remark ? '<div class="rm">📝 <span translate="no">' + esc(x.remark) + '</span></div>' : '') +
+      (x.imgs && x.imgs.length ? '<div class="thumbs">' + x.imgs.map(id => '<img class="thumb" data-img="' + esc(id) + '" alt="">').join('') + '</div>' : '') +
       (meta.length ? '<div class="meta">' + meta.join('') + '</div>' : '') +
       '<div class="acts"><button class="btn" data-ia="done">' + (x.done ? '↺ Belum' : '✓ Selesai') + '</button>' +
       (x.locZh ? '<button class="btn" data-ia="taxi">🚕 Pemandu</button>' : '') +
@@ -1542,6 +1585,7 @@
       '</div><button class="btn sm" data-ia="dates">🗓 Tarikh</button></div>' +
       (nx ? '<hr class="sep"><div class="small"><b class="out">▶ Seterusnya:</b> ' + esc(nx.title || itype(nx.type)[2]) + ' · ' + fmtDs(nx.d) + (nx.t1 ? ' ' + esc(nx.t1) : '') + (nx.locZh || nx.loc ? ' · 📍 ' + esc(nx.loc || nx.locZh) : '') + '</div>' : '') +
       '</div>';
+    h += pdfCardHTML();
     if (days.length) {
       h += '<div class="chips"><button class="chip' + (ui.itDay === 'all' ? ' on' : '') + '" data-itday="all">Semua</button>' +
         days.map(d => '<button class="chip' + (ui.itDay === d ? ' on' : '') + '" data-itday="' + d + '">' + (dayNo(d) ? 'Hari ' + dayNo(d) + ' · ' : '') + fmtDs(d) + (d === t ? ' •' : '') + '</button>').join('') + '</div>';
@@ -1566,6 +1610,7 @@
       (items.length ? '<div style="height:8px"></div><button class="btn block ghost" data-ia="clear" style="color:var(--red)">🗑 Padam semua itinerari</button>' : '') + '</div>' +
       '<div style="height:64px"></div><button class="fab" data-ia="add">＋ Tambah</button>';
     v.innerHTML = h;
+    hydrateImgs(v);
   }
   function itSheet(x, presetDate) {
     const isNew = !x;
@@ -1581,6 +1626,7 @@
       '<label class="field"><span>…atau pilih tempat popular</span><select class="input" id="i-place"><option value="">— Pilih —</option>' + (window.PLACES || []).map((p, i) => '<option value="' + i + '">' + esc(p[2]) + ' · ' + esc(p[0]) + '</option>').join('') + (S.hotel && S.hotel.nameZh ? '<option value="hotel">🏨 Hotel saya · ' + esc(S.hotel.nameZh) + '</option>' : '') + '</select></label>' +
       '<label class="field"><span>Butiran</span><textarea class="input" id="i-detail" rows="3" placeholder="Apa nak buat, tiket, pakaian, dll.">' + esc(st.detail) + '</textarea></label>' +
       '<label class="field"><span>Remark / tempat jumpa</span><textarea class="input" id="i-remark" rows="2" placeholder="Contoh: Jumpa di lobi hotel 8:30 pagi. Bawa pasport.">' + esc(st.remark) + '</textarea></label>' +
+      '<div class="field"><span>📷 Gambar</span><div class="thumbs" id="i-imgs"></div><input type="file" id="i-file" accept="image/*" multiple hidden><button class="btn block" id="i-addimg" type="button">➕ Tambah gambar (kamera / galeri)</button></div>' +
       '<div class="grid2"><label class="field"><span>No. tempahan / rujukan</span><input class="input" id="i-ref" value="' + esc(st.ref) + '"></label>' +
       '<label class="field"><span>No. telefon</span><input class="input" id="i-phone" inputmode="tel" value="' + esc(st.phone) + '"></label></div>' +
       '<label class="field"><span>Anggaran kos</span><div class="row"><input class="input num grow" id="i-cost" inputmode="decimal" value="' + esc(st.cost) + '" placeholder="0.00">' +
@@ -1601,6 +1647,29 @@
           if (val === 'hotel') { $('#i-loc', sh).value = S.hotel.nameEn || 'Hotel'; $('#i-locZh', sh).value = S.hotel.nameZh + (S.hotel.addr ? '（' + S.hotel.addr + '）' : ''); if (!$('#i-phone', sh).value) $('#i-phone', sh).value = S.hotel.phone || ''; }
           else { const p = PLACES[+val]; $('#i-loc', sh).value = p[2]; $('#i-locZh', sh).value = p[0]; if (!$('#i-title', sh).value) $('#i-title', sh).value = p[2]; }
         });
+        st.imgs = (st.imgs || []).slice(); const rmImgs = [];
+        const drawImgs = () => {
+          $('#i-imgs', sh).innerHTML = st.imgs.map(id => '<span class="tw"><img class="thumb" data-img="' + esc(id) + '" alt=""><button type="button" class="rmx" data-rm="' + esc(id) + '" aria-label="Buang">✕</button></span>').join('');
+          hydrateImgs($('#i-imgs', sh));
+        };
+        drawImgs();
+        $('#i-addimg', sh).onclick = () => $('#i-file', sh).click();
+        $('#i-file', sh).onchange = async e => {
+          const files = Array.from(e.target.files || []); e.target.value = ''; if (!files.length) return;
+          const btn = $('#i-addimg', sh); btn.disabled = true; let ok = 0;
+          for (let i = 0; i < files.length; i++) {
+            btn.textContent = '⏳ Memampatkan ' + (i + 1) + '/' + files.length + '…';
+            try { const b = await shrink(files[i]); const id = uid(); await ATT.put('img:' + id, b); st.imgs.push(id); ok++; }
+            catch (er) { toast('Gambar gagal: ' + String(er && er.message || er).slice(0, 80)); }
+          }
+          btn.disabled = false; btn.textContent = '➕ Tambah gambar (kamera / galeri)'; drawImgs();
+          if (ok) toast(ok + ' gambar ditambah — tekan Simpan');
+        };
+        $('#i-imgs', sh).addEventListener('click', e => {
+          const r = e.target.closest('[data-rm]');
+          if (r) { st.imgs = st.imgs.filter(i => i !== r.dataset.rm); rmImgs.push(r.dataset.rm); drawImgs(); return; }
+          const t = e.target.closest('.thumb'); if (t) imgViewer(st.imgs.slice(), Math.max(0, st.imgs.indexOf(t.dataset.img)));
+        });
         const grab = () => Object.assign(st, {
           d: $('#i-d', sh).value, t1: $('#i-t1', sh).value, t2: $('#i-t2', sh).value,
           title: $('#i-title', sh).value.trim(), loc: $('#i-loc', sh).value.trim(), locZh: $('#i-locZh', sh).value.trim(),
@@ -1615,7 +1684,9 @@
           const pv = $('#i-priv', sh);
           if (pv) { if (pv.checked && !st.priv) itGone(st); st.priv = pv.checked; }
           if (st.tx) { const tx = S.tx.find(t => t.id === st.tx); if (tx) { tx.amt = +st.cost || tx.amt; tx.cur = st.cur; tx.d = st.d || tx.d; tx.note = st.title || tx.note; } }
+          rmImgs.forEach(id => { if (!st.imgs.includes(id) && !(S.itin || []).some(i => i.id !== st.id && (i.imgs || []).includes(id))) { ATT.del('img:' + id).catch(() => {}); delete IMGURL[id]; } });
           const saved = Object.assign({}, st);
+          if (!saved.imgs || !saved.imgs.length) delete saved.imgs;
           itTouch(saved);
           S.itin = (S.itin || []).filter(i => i.id !== st.id).concat([saved]);
           if (st.d && ui.itDay !== 'all' && ui.itDay !== st.d) ui.itDay = st.d;
@@ -1711,6 +1782,10 @@
   $('#v-it').addEventListener('click', e => {
     const dc = e.target.closest('[data-itday]');
     if (dc) { ui.itDay = dc.dataset.itday; renderIt(); return; }
+    const th = e.target.closest('.thumb');
+    if (th) { const cd = th.closest('[data-itid]'); const x = cd && S.itin.find(i => i.id === cd.dataset.itid); if (x && x.imgs) imgViewer(x.imgs.slice(), Math.max(0, x.imgs.indexOf(th.dataset.img))); return; }
+    const mi = e.target.closest('.imgmiss');
+    if (mi) { delete IMGURL[mi.dataset.retry]; toast(navigator.onLine ? 'Mencuba memuat gambar…' : 'Tiada internet — gambar ini belum ada dalam telefon'); renderIt(); return; }
     const b = e.target.closest('[data-ia]');
     if (!b) {
       const card = e.target.closest('[data-itid]');
@@ -1721,6 +1796,9 @@
     if (a === 'add') { itSheet(null, b.dataset.d); return; }
     if (a === 'dates') { itDatesSheet(); return; }
     if (a === 'livejoin') { liveJoinSheet(); return; }
+    if (a === 'pdfopen') { pdfViewer(); return; }
+    if (a === 'pdfpick') { $('#pdfFile').click(); return; }
+    if (a === 'pdfdel') { ask('Padam PDF ini daripada telefon?', 'Padam', true).then(async ok => { if (!ok) return; try { await ATT.del('pdf'); } catch (e) {} if (S.pdf && S.pdf.off) S.pdfSkip = S.pdf.u; S.pdf = null; save(); renderIt(); toast('PDF dipadam'); }); return; }
     if (a === 'copy') { copyText(itText()); return; }
     if (a === 'csv') { download('itinerari-harbin.csv', itCsv(), 'text/csv;charset=utf-8'); return; }
     if (a === 'sample') { if ((S.itin || []).length) ask('Tambah contoh itinerari kepada senarai sedia ada?', 'Tambah').then(ok => ok && sampleItin()); else sampleItin(); return; }
@@ -1759,11 +1837,11 @@
     Object.keys(d).forEach(k => { if (S.pub[k] === undefined || (k === 'repo' && !S.pub.repo)) S.pub[k] = d[k]; });
     return S.pub;
   }
-  function stripIt(x) { const o = {}; ['id', 'd', 't1', 't2', 'type', 'title', 'loc', 'locZh', 'detail', 'remark', 'ref', 'phone', 'cost', 'cur'].forEach(k => { if (x[k] !== undefined && x[k] !== '') o[k] = x[k]; }); return o; }
+  function stripIt(x) { const o = {}; ['id', 'd', 't1', 't2', 'type', 'title', 'loc', 'locZh', 'detail', 'remark', 'ref', 'phone', 'cost', 'cur', 'imgs'].forEach(k => { if (x[k] !== undefined && x[k] !== '' && !(Array.isArray(x[k]) && !x[k].length)) o[k] = x[k]; }); return o; }
   function buildShared() {
     const c = pubCfg(), inc = c.inc;
     const o = {};
-    Object.keys(S.check || {}).forEach(id => { const st = S.check[id]; const x = {}; ['n', 'nt', 'q', 'p', 'pr'].forEach(k => { if (st[k] != null) x[k] = st[k]; }); if (Object.keys(x).length) o[id] = x; });
+    Object.keys(S.check || {}).forEach(id => { const st = S.check[id]; const x = {}; ['n', 'nt', 'q', 'p', 'pr', 'rm'].forEach(k => { if (st[k] != null) x[k] = st[k]; }); if (Object.keys(x).length) o[id] = x; });
     return {
       v: Date.now(), at: new Date().toISOString(), app: 'Arztech Harbin Trip',
       announce: (S.announce || '').trim(),
@@ -1771,6 +1849,7 @@
       hotel: inc.trip ? Object.assign({}, S.hotel) : null,
       itin: inc.itin && !liveReady() ? sortIt((S.itin || []).filter(x => !x.priv)).map(stripIt) : null,
       live: liveCfg().db ? { db: liveCfg().db } : null,
+      pdf: (inc.att !== false && S.pdf && !S.pdf.off && S.pdf.share !== false && S.pdf.pubU === S.pdf.u) ? { name: S.pdf.name, size: S.pdf.size, u: S.pdf.u, path: 'files/itinerari.pdf' } : null,
       phrases: inc.phr ? (S.mine || []).map(m => ({ ms: m.ms, en: m.en, zh: m.zh, py: m.py })) : [],
       ck: inc.ck ? { o, c: (S.custom || []).map(x => ({ id: x.id, cat: x.cat, name: x.name, note: x.note, qty: x.qty, price: x.price, pri: x.pri })) } : null
     };
@@ -1818,6 +1897,7 @@
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const d = await r.json();
       ui.remote = d;
+      syncPdf(d);
       if (ROLE === 'admin') { if (S.tab === 'in') renderIn(); return; }
       if (!d || !d.v) { if (manual) toast('Belum ada kandungan daripada penganjur'); return; }
       if (d.v <= (S.sharedV || 0)) { if (manual) toast('✓ Sudah versi terkini'); return; }
@@ -1855,8 +1935,8 @@
       '<p class="small" style="margin-top:0">Ubah itinerari, tarikh trip, kad hotel, ✍️ Frasa Saya dan harga/item checklist seperti biasa dalam app ini, kemudian tekan <b>Terbitkan</b>. Semua pengguna menerimanya bila app mereka online. <b>Kewangan dan tanda checklist anda kekal peribadi.</b></p>' +
       '<label class="field"><span>📢 Pengumuman kepada pengguna (pilihan)</span><textarea class="input" id="ad-ann" rows="3" placeholder="Contoh: Semua berkumpul di lobi hotel 8:00 pagi esok. Pakai baju tebal!">' + esc(S.announce || '') + '</textarea></label>' +
       '<div class="field"><span>Kandungan yang diterbitkan</span>' +
-      [['trip', 'Tarikh trip & kad hotel'], ['itin', 'Itinerari (' + (S.itin || []).length + ' aktiviti)'], ['phr', '✍️ Frasa Saya → Frasa penganjur (' + (S.mine || []).length + ')'], ['ck', 'Harga & item checklist yang diubah']].map(x =>
-        '<label class="row small" style="margin:6px 0"><input type="checkbox" data-inc="' + x[0] + '" ' + (c.inc[x[0]] ? 'checked' : '') + ' style="width:20px;height:20px"> ' + esc(x[1]) + '</label>').join('') + '</div>' +
+      [['trip', 'Tarikh trip & kad hotel'], ['itin', 'Itinerari (' + (S.itin || []).length + ' aktiviti)'], ['phr', '✍️ Frasa Saya → Frasa penganjur (' + (S.mine || []).length + ')'], ['ck', 'Harga & item checklist yang diubah'], ['att', '📷 Gambar aktiviti & 📄 PDF peta / laluan']].map(x =>
+        '<label class="row small" style="margin:6px 0"><input type="checkbox" data-inc="' + x[0] + '" ' + ((x[0] === 'att' ? c.inc.att !== false : c.inc[x[0]]) ? 'checked' : '') + ' style="width:20px;height:20px"> ' + esc(x[1]) + '</label>').join('') + '</div>' +
       '<button class="btn pri block" data-a="publish">🚀 Terbitkan kepada semua pengguna</button>' +
       '<div class="small muted" style="margin-top:8px">' + (c.lastAt ? 'Terakhir diterbitkan: ' + new Date(c.lastAt).toLocaleString('ms-MY') : 'Belum pernah diterbitkan.') +
       (R && R.v ? '<br>Versi di laman sekarang: ' + new Date(R.at || R.v).toLocaleString('ms-MY') + (c.lastV && R.v < c.lastV ? ' <span class="out">(laman sedang dikemas kini — tunggu 1–2 minit)</span>' : '') : '') + '</div>' +
@@ -1893,7 +1973,12 @@
       if (!navigator.onLine) { toast('Perlukan internet untuk terbitkan'); return; }
       if (!(await ask('Terbitkan kandungan ini kepada SEMUA pengguna?\n\n' + (json.itin ? json.itin.length + ' aktiviti itinerari\n' : '') + (json.phrases.length ? json.phrases.length + ' frasa\n' : '') + (json.announce ? 'Pengumuman: “' + json.announce.slice(0, 80) + '”' : ''), '🚀 Terbitkan'))) return;
       const btn = $('[data-a="publish"]'); if (btn) { btn.disabled = true; btn.textContent = '⏳ Menerbitkan…'; }
-      try { await publishGH(json); toast('✅ Diterbitkan! Pengguna akan terima dalam 1–2 minit bila online'); }
+      try {
+        if (c.inc.att !== false) await publishAtt(t => { if (btn) btn.textContent = t; });
+        if (btn) btn.textContent = '⏳ Menerbitkan…';
+        await publishGH(buildShared());
+        toast('✅ Diterbitkan! Pengguna akan terima dalam 1–2 minit bila online');
+      }
       catch (e) { toast('❌ ' + (e.message || 'Gagal').slice(0, 140)); }
       renderIn();
     }
@@ -1907,14 +1992,14 @@
   // Ciri ditangguhkan: tukar kepada true untuk hidupkan semula itinerari bersama (Firebase)
   const LIVE_FEATURE = true;
   const LV = { es: null, status: 'off', retry: null, lastWho: '', flushing: false };
-  const LIVE_FIELDS = ['id', 'd', 't1', 't2', 'type', 'title', 'loc', 'locZh', 'detail', 'remark', 'ref', 'phone', 'cost', 'cur', 'u', 'by'];
+  const LIVE_FIELDS = ['id', 'd', 't1', 't2', 'type', 'title', 'loc', 'locZh', 'detail', 'remark', 'ref', 'phone', 'cost', 'cur', 'imgs', 'u', 'by'];
   function liveCfg() { if (!S.live || typeof S.live !== 'object') S.live = {}; const d = { db: '', code: '', on: false }; Object.keys(d).forEach(k => { if (S.live[k] === undefined) S.live[k] = d[k]; }); return S.live; }
   function liveDb() { const c = liveCfg(); return c.db || (S.shared && S.shared.live && S.shared.live.db) || ''; }
   function liveReady() { const c = liveCfg(); return !!(LIVE_FEATURE && c.on && c.code && liveDb() && onWeb()); }
   function normDb(u) { u = String(u || '').trim().replace(/\/+$/, ''); if (u && !/^https?:\/\//.test(u)) u = 'https://' + u; return u; }
   function normCode(c) { return String(c || '').trim().toUpperCase().replace(/[^A-Z0-9-]/g, ''); }
   function liveBase() { return normDb(liveDb()) + '/g/' + encodeURIComponent(liveCfg().code); }
-  function liveItem(x) { const o = {}; LIVE_FIELDS.forEach(k => { if (x[k] !== undefined && x[k] !== '') o[k] = x[k]; }); return o; }
+  function liveItem(x) { const o = {}; LIVE_FIELDS.forEach(k => { if (x[k] !== undefined && x[k] !== '' && !(Array.isArray(x[k]) && !x[k].length)) o[k] = x[k]; }); return o; }
   function newCode() { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = 'HRB-'; const r = crypto.getRandomValues(new Uint8Array(8)); r.forEach(n => { s += A[n % A.length]; }); return s; }
   function setLive(st) { LV.status = st; const el = $('#liveBar'); if (el) el.outerHTML = liveBarHTML(); }
   function liveBarHTML() {
@@ -2132,6 +2217,201 @@
     if (code.length >= 8 && LIVE_FEATURE) { c.code = code; save(); setTimeout(() => liveJoinSheet(code), 400); }
   })();
 
+  $('#v-it').addEventListener('change', e => {
+    if (e.target.id === 'pdfFile') pdfSave(e.target.files && e.target.files[0]);
+    else if (e.target.matches && e.target.matches('[data-pdfshare]') && S.pdf) { S.pdf.share = e.target.checked; save(); }
+  });
+  // =====================================================================
+  // 8) LAMPIRAN — gambar aktiviti & satu fail PDF (disimpan dalam telefon, boleh guna offline)
+  // =====================================================================
+  const ATT = (() => {
+    let dbp = null;
+    const open = () => dbp || (dbp = new Promise((res, rej) => {
+      try {
+        const r = indexedDB.open('harbin-att-' + (ROLE === 'admin' ? 'admin' : 'user'), 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('f');
+        r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+      } catch (e) { rej(e); }
+    }));
+    const run = (mode, fn) => open().then(db => new Promise((res, rej) => {
+      const t = db.transaction('f', mode); const rq = fn(t.objectStore('f'));
+      t.oncomplete = () => res(rq && rq.result); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error || new Error('abort'));
+    }));
+    return { put: (k, v) => run('readwrite', s => s.put(v, k)), get: k => run('readonly', s => s.get(k)), del: k => run('readwrite', s => s.delete(k)), keys: () => run('readonly', s => s.getAllKeys()) };
+  })();
+  const IMGURL = {};
+  async function imgUrl(id) {
+    if (IMGURL[id]) return IMGURL[id];
+    let b = null; try { b = await ATT.get('img:' + id); } catch (e) {}
+    if (!b && onWeb() && navigator.onLine) { // gambar yang diterbitkan oleh penganjur
+      try { const r = await fetch('files/img/' + encodeURIComponent(id) + '.jpg?t=' + Date.now(), { cache: 'no-store' }); if (r.ok) { b = await r.blob(); try { await ATT.put('img:' + id, b); } catch (e) {} } } catch (e) {}
+    }
+    return b ? (IMGURL[id] = URL.createObjectURL(b)) : '';
+  }
+  async function hydrateImgs(root) {
+    $$('img[data-img]', root || document).forEach(async el => {
+      const u = await imgUrl(el.dataset.img);
+      if (u) { el.src = u; el.classList.add('ok'); }
+      else { const m = document.createElement('button'); m.type = 'button'; m.className = 'imgmiss'; m.dataset.retry = el.dataset.img; m.textContent = '🖼 gambar belum tersedia'; el.replaceWith(m); }
+    });
+  }
+  async function shrink(file, max, q) {
+    max = max || 1280; q = q || 0.82;
+    let bmp;
+    try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+    catch (e) { bmp = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('Format gambar tidak disokong')); im.src = URL.createObjectURL(file); }); }
+    const w = bmp.width || bmp.naturalWidth, h = bmp.height || bmp.naturalHeight, k = Math.min(1, max / Math.max(w, h));
+    const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k));
+    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(bmp, 0, 0, c.width, c.height);
+    if (bmp.close) bmp.close();
+    return new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('Gagal memampatkan gambar')), 'image/jpeg', q));
+  }
+  function imgViewer(ids, i) {
+    const el = document.createElement('div'); el.className = 'imgv';
+    el.innerHTML = '<img alt=""><button class="x" data-x="c">✕</button>' + (ids.length > 1 ? '<button class="nv p" data-x="p">‹</button><button class="nv n" data-x="n">›</button><span class="cnt"></span>' : '');
+    const im = $('img', el), cnt = $('.cnt', el);
+    const show = async () => { im.src = (await imgUrl(ids[i])) || ''; if (cnt) cnt.textContent = (i + 1) + ' / ' + ids.length; };
+    el.onclick = e => {
+      const b = e.target.closest('[data-x]');
+      if (b) { const a = b.dataset.x; if (a === 'c') { el.remove(); return; } i = (i + (a === 'n' ? 1 : -1) + ids.length) % ids.length; show(); }
+      else if (e.target === el || e.target === im) el.remove();
+    };
+    document.body.appendChild(el); show();
+  }
+  async function gcImgs() { // buang gambar yatim (contoh: ditambah tetapi aktiviti tidak disimpan)
+    try {
+      const used = new Set(); (S.itin || []).forEach(x => (x.imgs || []).forEach(id => used.add(id)));
+      (await ATT.keys()).forEach(k => { if (typeof k === 'string' && k.startsWith('img:') && !used.has(k.slice(4))) ATT.del(k); });
+    } catch (e) {}
+  }
+  // ---- PDF ----
+  const pdfMB = b => b < 1048576 ? Math.max(1, Math.round(b / 1024)) + ' KB' : (b / 1048576).toFixed(b > 10485760 ? 0 : 1) + ' MB';
+  function warmPdfjs() {
+    if (!onWeb()) return;
+    try { fetch('vendor/pdf.min.js'); fetch('vendor/pdf.worker.min.js'); } catch (e) {}
+    try { navigator.serviceWorker && navigator.serviceWorker.ready.then(r => r.active && r.active.postMessage('cache-vendor')); } catch (e) {}
+  }
+  function pdfCardHTML() {
+    const p = S.pdf;
+    return '<div class="card pdfc"><b>📄 Peta / laluan (PDF)</b>' +
+      (p ? '<div class="small muted" style="margin-top:2px"><span translate="no">' + esc(p.name) + '</span> · ' + pdfMB(p.size) + (p.off ? ' · 📢 daripada penganjur' : '') + '</div>'
+        : '<div class="small muted" style="margin-top:2px">Letak satu PDF (laluan, peta, jadual) untuk dibuka terus dalam app, juga tanpa internet.</div>') +
+      '<div class="row" style="margin-top:10px;gap:8px">' + (p ? '<button class="btn pri grow" data-ia="pdfopen">📖 Buka PDF</button><button class="btn" data-ia="pdfpick">Tukar fail</button><button class="btn" data-ia="pdfdel" aria-label="Padam">🗑</button>' : '<button class="btn pri block" data-ia="pdfpick">📎 Pilih fail PDF</button>') + '</div>' +
+      (p && ROLE === 'admin' && onWeb() && !p.off ? '<label class="row small" style="margin:10px 0 0"><input type="checkbox" data-pdfshare ' + (p.share !== false ? 'checked' : '') + ' style="width:20px;height:20px"> Kongsi PDF ini kepada semua pengguna (bila Terbitkan)</label>' : '') +
+      '<input type="file" id="pdfFile" accept="application/pdf,.pdf" hidden></div>';
+  }
+  async function pdfSave(file) {
+    if (!file) return;
+    if (!/pdf/i.test(file.type) && !/\.pdf$/i.test(file.name)) { toast('Pilih fail PDF sahaja'); return; }
+    if (file.size > 60 * 1048576) { toast('PDF terlalu besar (maksimum 60 MB)'); return; }
+    try { await ATT.put('pdf', file); } catch (e) { toast('Gagal simpan PDF — storan telefon penuh atau disekat'); return; }
+    S.pdf = { name: file.name, size: file.size, u: Date.now(), share: true, off: false };
+    save(); warmPdfjs(); renderIt();
+    toast('✅ PDF disimpan — boleh dibuka tanpa internet');
+  }
+  let pdfjsP = null;
+  function loadPdfjs() {
+    if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+    if (!onWeb()) return Promise.reject(new Error('tiada'));
+    return pdfjsP || (pdfjsP = new Promise((res, rej) => {
+      const s = document.createElement('script'); s.src = new URL('vendor/pdf.min.js', document.baseURI).href;
+      s.onload = () => { try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('vendor/pdf.worker.min.js', document.baseURI).href; res(window.pdfjsLib); } catch (e) { rej(e); } };
+      s.onerror = () => { pdfjsP = null; rej(new Error('Pustaka PDF tidak dapat dimuatkan')); };
+      document.head.appendChild(s);
+    }));
+  }
+  async function pdfViewer() {
+    let blob = null; try { blob = await ATT.get('pdf'); } catch (e) {}
+    if (!blob || !S.pdf) { toast('Fail PDF tidak dijumpai — pilih semula'); return; }
+    const url = URL.createObjectURL(blob);
+    const ext = () => { if (!window.open(url, '_blank')) location.href = url; };
+    let lib;
+    try { lib = await loadPdfjs(); } catch (e) { toast('Pembaca PDF dalam app tidak tersedia — dibuka di pelayar'); ext(); return; }
+    const el = document.createElement('div'); el.className = 'pdfv';
+    el.innerHTML = '<div class="bar"><b class="grow" translate="no">' + esc(S.pdf.name) + '</b><button data-x="out" aria-label="Zum keluar">−</button><span class="zl">100%</span><button data-x="in" aria-label="Zum masuk">＋</button><button data-x="ext" title="Buka di pelayar">↗</button><button data-x="c" aria-label="Tutup">✕</button></div><div class="pg"><div class="pgi"><div class="small muted" style="padding:24px;text-align:center">Memuatkan…</div></div></div>';
+    document.body.appendChild(el);
+    const box = $('.pg', el), inner = $('.pgi', el); let zoom = 1, doc = null, io = null, gen = 0;
+    const close = () => { gen++; try { io && io.disconnect(); doc && doc.destroy(); } catch (e) {} URL.revokeObjectURL(url); el.remove(); };
+    el.onclick = e => {
+      const b = e.target.closest('[data-x]'); if (!b) return; const a = b.dataset.x;
+      if (a === 'c') close(); else if (a === 'ext') ext();
+      else if (doc) { zoom = Math.min(4, Math.max(0.6, zoom + (a === 'in' ? 0.4 : -0.4))); $('.zl', el).textContent = Math.round(zoom * 100) + '%'; draw(true); }
+    };
+    async function renderPage(d, W, g) {
+      const page = await doc.getPage(+d.dataset.n); if (g !== gen) return;
+      const v0 = page.getViewport({ scale: 1 }), vp = page.getViewport({ scale: (W / v0.width) * zoom });
+      let dpr = Math.min(window.devicePixelRatio || 1, 2); while (vp.width * dpr * vp.height * dpr > 12e6 && dpr > 0.5) dpr -= 0.25;
+      const c = document.createElement('canvas'); c.width = Math.floor(vp.width * dpr); c.height = Math.floor(vp.height * dpr);
+      c.style.width = Math.floor(vp.width) + 'px'; c.style.height = Math.floor(vp.height) + 'px';
+      d.style.width = c.style.width; d.style.height = c.style.height;
+      await page.render({ canvasContext: c.getContext('2d'), viewport: vp, transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null }).promise;
+      if (g !== gen) return; d.innerHTML = ''; d.appendChild(c);
+    }
+    async function draw(keep) {
+      const g = ++gen; if (io) io.disconnect();
+      const ratio = keep && box.scrollHeight ? box.scrollTop / box.scrollHeight : 0;
+      const W = Math.max(200, box.clientWidth - 12);
+      const first = await doc.getPage(1); const v1 = first.getViewport({ scale: 1 }), sc = (W / v1.width) * zoom;
+      inner.innerHTML = '';
+      for (let n = 1; n <= doc.numPages; n++) { const d = document.createElement('div'); d.className = 'pgc'; d.dataset.n = n; d.style.width = Math.round(v1.width * sc) + 'px'; d.style.height = Math.round(v1.height * sc) + 'px'; inner.appendChild(d); }
+      io = new IntersectionObserver(es => es.forEach(en => { if (en.isIntersecting) { io.unobserve(en.target); renderPage(en.target, W, g).catch(() => {}); } }), { root: box, rootMargin: '900px 0px' });
+      $$('.pgc', inner).forEach(d => io.observe(d));
+      box.scrollTop = ratio * box.scrollHeight;
+    }
+    try {
+      doc = await lib.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
+      await draw(false);
+    } catch (e) { inner.innerHTML = '<div class="note" style="margin:20px">⚠ PDF tidak dapat dibaca. Cuba <b>↗ Buka di pelayar</b>.</div>'; }
+  }
+  // Pengguna: ambil PDF daripada penganjur
+  async function syncPdf(d) {
+    if (ROLE === 'admin' || !onWeb() || !d || !d.v || !navigator.onLine) return; // data kosong/tiada internet: jangan sentuh PDF
+    const o = d.pdf;
+    try {
+      if (!o || !o.u) { if (S.pdf && S.pdf.off) { await ATT.del('pdf'); S.pdf = null; S.pdfSkip = 0; save(); if (S.tab === 'it') renderIt(); } return; }
+      if (S.pdf && !S.pdf.off) return; // PDF sendiri pengguna dikekalkan
+      if (S.pdf && S.pdf.off && S.pdf.u === o.u) return;
+      if (S.pdfSkip === o.u || !navigator.onLine) return;
+      const r = await fetch(o.path + '?v=' + o.u, { cache: 'no-store' }); if (!r.ok) return;
+      const b = await r.blob(); await ATT.put('pdf', b);
+      S.pdf = { name: o.name, size: b.size, u: o.u, off: true }; save(); warmPdfjs();
+      if (S.tab === 'it') renderIt(); toast('📄 PDF daripada penganjur diterima');
+    } catch (e) {}
+  }
+  // Admin: terbitkan gambar & PDF ke repo
+  const blobB64 = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = () => rej(new Error('Gagal membaca fail')); r.readAsDataURL(blob); });
+  async function ghPutFile(rel, b64, msg) {
+    const c = pubCfg();
+    const token = (() => { try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; } })();
+    if (!token) throw new Error('Token GitHub belum diisi (Tetapan GitHub di bawah).');
+    if (!/^[^/\s]+\/[^/\s]+$/.test(c.repo)) throw new Error('Nama repo tidak sah. Format: pemilik/repo');
+    const full = c.path.replace(/data\/shared\.json$/, '') + rel;
+    const api = 'https://api.github.com/repos/' + c.repo + '/contents/' + full.split('/').map(encodeURIComponent).join('/');
+    const H = { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' };
+    let sha; const g = await fetch(api + '?ref=' + encodeURIComponent(c.branch) + '&t=' + Date.now(), { headers: H, cache: 'no-store' });
+    if (g.ok) sha = (await g.json()).sha; else if (g.status !== 404) throw new Error('GitHub ' + g.status);
+    const body = { message: msg, content: b64, branch: c.branch }; if (sha) body.sha = sha;
+    const p = await fetch(api, { method: 'PUT', headers: Object.assign({ 'Content-Type': 'application/json' }, H), body: JSON.stringify(body) });
+    if (!p.ok) { const t = await p.json().catch(() => ({})); throw new Error('GitHub ' + p.status + ': ' + (t.message || 'gagal')); }
+  }
+  async function publishAtt(step) {
+    const c = pubCfg(); c.imgs = c.imgs || [];
+    const ids = []; (S.itin || []).filter(x => !x.priv).forEach(x => (x.imgs || []).forEach(id => { if (!ids.includes(id) && !c.imgs.includes(id)) ids.push(id); }));
+    for (let i = 0; i < ids.length; i++) {
+      const b = await ATT.get('img:' + ids[i]); if (!b) continue;
+      step('🖼 Menerbitkan gambar ' + (i + 1) + '/' + ids.length + '…');
+      await ghPutFile('files/img/' + ids[i] + '.jpg', await blobB64(b), 'Gambar aktiviti'); c.imgs.push(ids[i]); save();
+    }
+    const p = S.pdf;
+    if (p && !p.off && p.share !== false && p.pubU !== p.u) {
+      if (p.size > 25 * 1048576) throw new Error('PDF terlalu besar untuk dikongsi (maksimum ~25 MB)');
+      const b = await ATT.get('pdf'); if (!b) throw new Error('Fail PDF tidak dijumpai — pilih semula');
+      step('📄 Menerbitkan PDF…');
+      await ghPutFile('files/itinerari.pdf', await blobB64(b), 'PDF peta / laluan'); p.pubU = p.u; save();
+    }
+  }
+
+
   // ---------- Header, tab & permulaan ----------
   function updateHeader() {
     const c = $('#countdown');
@@ -2160,7 +2440,7 @@
   window.addEventListener('offline', () => { renderPack(); liveStop(); setLive('off'); });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { syncShared(false); if (liveReady() && !LV.es) liveStart(); } });
   window.addEventListener('offline', updateHeader);
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeSheet(); $$('.show').forEach(x => x.remove()); } });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeSheet(); $$('.show,.imgv').forEach(x => x.remove()); const pv = $('.pdfv [data-x="c"]'); if (pv) pv.click(); } });
 
   if (!RENDER[S.tab]) S.tab = 'tr';
   setTab(S.tab);
@@ -2179,6 +2459,7 @@
   if (ROLE === 'admin') { const pill = document.createElement('span'); pill.className = 'pill adminpill'; pill.textContent = 'ADMIN'; $('.top-in').insertBefore(pill, $('#netpill')); }
   syncShared(false);
   liveStart();
+  setTimeout(gcImgs, 8000);
 
   if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) {
     window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
