@@ -308,3 +308,6 @@ nav.tabs button{font-size:11px;padding:0 2px}
 .pdfv .pgi{width:max-content;min-width:100%}
 .pdfv .pgc{background:#fff;margin:0 auto 8px;box-shadow:0 2px 8px rgba(0,0,0,.35)}
 .pdfv canvas{display:block}
+
+.docrow{display:flex;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.docth{width:56px;height:72px;object-fit:cover;object-position:top;border-radius:8px;border:1px solid var(--line);background:var(--surface2);flex:none}

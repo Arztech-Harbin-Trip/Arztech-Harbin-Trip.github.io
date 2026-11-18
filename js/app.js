@@ -1453,7 +1453,7 @@
       '<li>Sentiasa buka app dari ikon Home Screen (data disimpan di situ).</li></ol>' +
       '<p class="small muted" style="margin:6px 0 0">Status: ' + (navigator.serviceWorker && navigator.serviceWorker.controller ? '✓ App sudah disimpan untuk guna offline.' : (location.protocol === 'file:' ? 'Dibuka sebagai fail tempatan.' : 'Belum disimpan offline — muat semula halaman sekali semasa online.')) + '</p></div>';
 
-    h += '<p class="small muted" style="text-align:center">Arztech Harbin Trip v12.1 · Semua harga & maklumat ialah anggaran — sahkan sebelum berlepas.</p>';
+    h += '<p class="small muted" style="text-align:center">Arztech Harbin Trip v13 · Semua harga & maklumat ialah anggaran — sahkan sebelum berlepas.</p>';
     v.innerHTML = h;
 
     const saveTrip = () => { S.trip.start = $('#tr-s').value; S.trip.end = $('#tr-e').value; save(); updateHeader(); };
@@ -1585,7 +1585,7 @@
       '</div><button class="btn sm" data-ia="dates">🗓 Tarikh</button></div>' +
       (nx ? '<hr class="sep"><div class="small"><b class="out">▶ Seterusnya:</b> ' + esc(nx.title || itype(nx.type)[2]) + ' · ' + fmtDs(nx.d) + (nx.t1 ? ' ' + esc(nx.t1) : '') + (nx.locZh || nx.loc ? ' · 📍 ' + esc(nx.loc || nx.locZh) : '') + '</div>' : '') +
       '</div>';
-    h += pdfCardHTML();
+    h += docsCardHTML() + pdfCardHTML();
     if (days.length) {
       h += '<div class="chips"><button class="chip' + (ui.itDay === 'all' ? ' on' : '') + '" data-itday="all">Semua</button>' +
         days.map(d => '<button class="chip' + (ui.itDay === d ? ' on' : '') + '" data-itday="' + d + '">' + (dayNo(d) ? 'Hari ' + dayNo(d) + ' · ' : '') + fmtDs(d) + (d === t ? ' •' : '') + '</button>').join('') + '</div>';
@@ -1701,7 +1701,7 @@
           save(); closeSheet(); renderIt(); toast('Direkod dalam Kewangan (cara bayar: Tunai — boleh ubah di tab Kewangan)');
         };
         if ($('#i-revert', sh)) $('#i-revert', sh).onclick = () => {
-          const orig = ((S.shared && S.shared.itin) || []).find(i => i.id === st.id);
+          const orig = ((S.shared && S.shared.itin) || []).find(i => i.id === st.id) || ((window.TRIP_SEED && TRIP_SEED.itin) || []).find(i => i.id === st.id);
           const cur = S.itin.find(i => i.id === st.id) || {};
           S.itin = S.itin.filter(i => i.id !== st.id);
           if (orig) { const o2 = Object.assign({}, orig, { off: true, mod: false, done: !!cur.done, tx: cur.tx }); itTouch(o2); S.itin.push(o2); liveFlush(); }
@@ -1796,7 +1796,8 @@
     if (a === 'add') { itSheet(null, b.dataset.d); return; }
     if (a === 'dates') { itDatesSheet(); return; }
     if (a === 'livejoin') { liveJoinSheet(); return; }
-    if (a === 'pdfopen') { pdfViewer(); return; }
+    if (a === 'pdfopen') { pdfViewer('pdf', S.pdf && S.pdf.name); return; }
+    if (a === 'docopen') { const dr = b.closest('[data-doc]'); if (dr) openDoc(dr.dataset.doc); return; }
     if (a === 'pdfpick') { $('#pdfFile').click(); return; }
     if (a === 'pdfdel') { ask('Padam PDF ini daripada telefon?', 'Padam', true).then(async ok => { if (!ok) return; try { await ATT.del('pdf'); } catch (e) {} if (S.pdf && S.pdf.off) S.pdfSkip = S.pdf.u; S.pdf = null; save(); renderIt(); toast('PDF dipadam'); }); return; }
     if (a === 'copy') { copyText(itText()); return; }
@@ -2281,6 +2282,7 @@
   async function gcImgs() { // buang gambar yatim (contoh: ditambah tetapi aktiviti tidak disimpan)
     try {
       const used = new Set(); (S.itin || []).forEach(x => (x.imgs || []).forEach(id => used.add(id)));
+      const SD = window.TRIP_SEED || {}; (SD.docs || []).forEach(d => d.thumb && used.add(d.thumb)); (SD.itin || []).forEach(x => (x.imgs || []).forEach(id => used.add(id)));
       (await ATT.keys()).forEach(k => { if (typeof k === 'string' && k.startsWith('img:') && !used.has(k.slice(4))) ATT.del(k); });
     } catch (e) {}
   }
@@ -2293,7 +2295,7 @@
   }
   function pdfCardHTML() {
     const p = S.pdf;
-    return '<div class="card pdfc"><b>📄 Peta / laluan (PDF)</b>' +
+    return '<div class="card pdfc"><b>📄 PDF tambahan saya</b>' +
       (p ? '<div class="small muted" style="margin-top:2px"><span translate="no">' + esc(p.name) + '</span> · ' + pdfMB(p.size) + (p.off ? ' · 📢 daripada penganjur' : '') + '</div>'
         : '<div class="small muted" style="margin-top:2px">Letak satu PDF (laluan, peta, jadual) untuk dibuka terus dalam app, juga tanpa internet.</div>') +
       '<div class="row" style="margin-top:10px;gap:8px">' + (p ? '<button class="btn pri grow" data-ia="pdfopen">📖 Buka PDF</button><button class="btn" data-ia="pdfpick">Tukar fail</button><button class="btn" data-ia="pdfdel" aria-label="Padam">🗑</button>' : '<button class="btn pri block" data-ia="pdfpick">📎 Pilih fail PDF</button>') + '</div>' +
@@ -2320,15 +2322,15 @@
       document.head.appendChild(s);
     }));
   }
-  async function pdfViewer() {
-    let blob = null; try { blob = await ATT.get('pdf'); } catch (e) {}
-    if (!blob || !S.pdf) { toast('Fail PDF tidak dijumpai — pilih semula'); return; }
+  async function pdfViewer(key, title) {
+    let blob = null; try { blob = await ATT.get(key || 'pdf'); } catch (e) {}
+    if (!blob) { toast('Fail PDF tidak dijumpai — pilih semula'); return; }
     const url = URL.createObjectURL(blob);
     const ext = () => { if (!window.open(url, '_blank')) location.href = url; };
     let lib;
     try { lib = await loadPdfjs(); } catch (e) { toast('Pembaca PDF dalam app tidak tersedia — dibuka di pelayar'); ext(); return; }
     const el = document.createElement('div'); el.className = 'pdfv';
-    el.innerHTML = '<div class="bar"><b class="grow" translate="no">' + esc(S.pdf.name) + '</b><button data-x="out" aria-label="Zum keluar">−</button><span class="zl">100%</span><button data-x="in" aria-label="Zum masuk">＋</button><button data-x="ext" title="Buka di pelayar">↗</button><button data-x="c" aria-label="Tutup">✕</button></div><div class="pg"><div class="pgi"><div class="small muted" style="padding:24px;text-align:center">Memuatkan…</div></div></div>';
+    el.innerHTML = '<div class="bar"><b class="grow" translate="no">' + esc(title || (S.pdf && S.pdf.name) || 'PDF') + '</b><button data-x="out" aria-label="Zum keluar">−</button><span class="zl">100%</span><button data-x="in" aria-label="Zum masuk">＋</button><button data-x="ext" title="Buka di pelayar">↗</button><button data-x="c" aria-label="Tutup">✕</button></div><div class="pg"><div class="pgi"><div class="small muted" style="padding:24px;text-align:center">Memuatkan…</div></div></div>';
     document.body.appendChild(el);
     const box = $('.pg', el), inner = $('.pgi', el); let zoom = 1, doc = null, io = null, gen = 0;
     const close = () => { gen++; try { io && io.disconnect(); doc && doc.destroy(); } catch (e) {} URL.revokeObjectURL(url); el.remove(); };
@@ -2362,6 +2364,53 @@
       doc = await lib.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
       await draw(false);
     } catch (e) { inner.innerHTML = '<div class="note" style="margin:20px">⚠ PDF tidak dapat dibaca. Cuba <b>↗ Buka di pelayar</b>.</div>'; }
+  }
+  // ---- Dokumen trip (disertakan bersama app) ----
+  function docsCardHTML() {
+    const D = window.TRIP_SEED; if (!D || !D.docs || !D.docs.length) return '';
+    return '<div class="card"><b>📎 Dokumen trip</b><div class="small muted" style="margin:2px 0 6px">Boleh dibuka tanpa internet selepas disimpan.</div>' +
+      D.docs.map(d => '<div class="docrow" data-doc="' + esc(d.id) + '"><img class="docth" data-img="' + esc(d.thumb) + '" alt=""><div class="grow"><b translate="no">' + esc(d.title) + '</b><div class="small muted">' + esc(d.desc) + ' · ' + pdfMB(d.size) + '</div></div><button class="btn pri sm" data-ia="docopen">📖 Buka</button></div>').join('') + '</div>';
+  }
+  async function ensureDoc(d) {
+    let b = null; try { b = await ATT.get('doc:' + d.id); } catch (e) {}
+    if (b) return b;
+    if (!onWeb() || !navigator.onLine) return null;
+    try { const r = await fetch(d.path + '?v=' + window.TRIP_SEED.v, { cache: 'no-store' }); if (!r.ok) return null; b = await r.blob(); await ATT.put('doc:' + d.id, b); return b; } catch (e) { return null; }
+  }
+  async function openDoc(id) {
+    const d = ((window.TRIP_SEED && TRIP_SEED.docs) || []).find(x => x.id === id); if (!d) return;
+    let have = false; try { have = !!(await ATT.get('doc:' + id)); } catch (e) {}
+    if (!have) {
+      if (!onWeb()) { toast('Dokumen ini hanya tersedia dalam app yang dibuka dari laman web'); return; }
+      if (!navigator.onLine) { toast('Dokumen belum disimpan — sambung internet sekali untuk muat turun'); return; }
+      toast('⏳ Memuat turun dokumen…'); const b = await ensureDoc(d);
+      if (!b) { toast('Gagal memuat turun dokumen'); return; }
+      warmPdfjs();
+    }
+    pdfViewer('doc:' + id, d.title);
+  }
+  async function prefetchTrip() { // simpan gambar & dokumen trip supaya boleh dilihat tanpa internet
+    const D = window.TRIP_SEED; if (!D || !onWeb() || !navigator.onLine) return;
+    let got = 0; const ids = new Set();
+    (D.itin || []).forEach(x => (x.imgs || []).forEach(i => ids.add(i))); (D.docs || []).forEach(d => d.thumb && ids.add(d.thumb));
+    for (const id of ids) { let has = false; try { has = !!(await ATT.get('img:' + id)); } catch (e) {} if (!has && (await imgUrl(id))) got++; }
+    for (const d of (D.docs || [])) { let has = false; try { has = !!(await ATT.get('doc:' + d.id)); } catch (e) {} if (!has && (await ensureDoc(d))) got++; }
+    if (got) { warmPdfjs(); if (S.tab === 'it') renderIt(); toast('📎 Gambar & dokumen trip disimpan untuk guna offline'); }
+  }
+  // Itinerari rasmi (data-trip.js): dimasukkan sekali; aktiviti yang pengguna ubah/padam tidak ditimpa
+  function applySeed() {
+    const D = window.TRIP_SEED; if (!D || S.seedV === D.v) return;
+    if (D.trip && !S.trip.start) S.trip = Object.assign({}, D.trip);
+    if (D.hotel && !(S.hotel && (S.hotel.nameZh || S.hotel.addr))) S.hotel = Object.assign({}, D.hotel);
+    const hidden = new Set(S.itinHidden || []); S.itin = S.itin || [];
+    const byId = {}; S.itin.forEach(x => { byId[x.id] = x; });
+    D.itin.forEach(it => {
+      if (hidden.has(it.id)) return;
+      const cur = byId[it.id];
+      if (!cur) S.itin.push(Object.assign({ done: false }, it, { off: true, mod: false, seed: 1 }));
+      else if (cur.seed && !cur.mod) Object.assign(cur, it, { off: true, seed: 1 });
+    });
+    S.seedV = D.v; save();
   }
   // Pengguna: ambil PDF daripada penganjur
   async function syncPdf(d) {
@@ -2436,12 +2485,13 @@
   }
   function renderAll() { updateHeader(); RENDER[S.tab](); }
   $$('nav.tabs button').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
-  window.addEventListener('online', () => { updateHeader(); syncShared(false); renderPack(); liveStart(); });
+  window.addEventListener('online', () => { updateHeader(); syncShared(false); renderPack(); liveStart(); setTimeout(prefetchTrip, 1500); });
   window.addEventListener('offline', () => { renderPack(); liveStop(); setLive('off'); });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { syncShared(false); if (liveReady() && !LV.es) liveStart(); } });
   window.addEventListener('offline', updateHeader);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeSheet(); $$('.show,.imgv').forEach(x => x.remove()); const pv = $('.pdfv [data-x="c"]'); if (pv) pv.click(); } });
 
+  applySeed();
   if (!RENDER[S.tab]) S.tab = 'tr';
   setTab(S.tab);
   updateHeader();
@@ -2460,6 +2510,7 @@
   syncShared(false);
   liveStart();
   setTimeout(gcImgs, 8000);
+  setTimeout(prefetchTrip, 3500);
 
   if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) {
     window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
