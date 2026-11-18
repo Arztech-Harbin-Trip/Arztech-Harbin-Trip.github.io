@@ -1502,7 +1502,7 @@
       '<li>Sentiasa buka app dari ikon Home Screen (data disimpan di situ).</li></ol>' +
       '<p class="small muted" style="margin:6px 0 0">Status: ' + (navigator.serviceWorker && navigator.serviceWorker.controller ? '✓ App sudah disimpan untuk guna offline.' : (location.protocol === 'file:' ? 'Dibuka sebagai fail tempatan.' : 'Belum disimpan offline — muat semula halaman sekali semasa online.')) + '</p></div>';
 
-    h += '<p class="small muted" style="text-align:center">Arztech Harbin Trip v14.2 · Semua harga & maklumat ialah anggaran — sahkan sebelum berlepas.</p>';
+    h += '<p class="small muted" style="text-align:center">Arztech Harbin Trip v14.3 · Semua harga & maklumat ialah anggaran — sahkan sebelum berlepas.</p>';
     v.innerHTML = h;
 
     const saveTrip = () => { S.trip.start = $('#tr-s').value; S.trip.end = $('#tr-e').value; save(); updateHeader(); };
@@ -2401,8 +2401,8 @@
       document.head.appendChild(s);
     }));
   }
-  async function pdfViewer(key, title, fname) {
-    let blob = null; try { blob = await ATT.get(key || 'pdf'); } catch (e) {}
+  async function pdfViewer(key, title, fname, blobIn) {
+    let blob = blobIn || null; if (!blob) { try { blob = await ATT.get(key || 'pdf'); } catch (e) {} }
     if (!blob) { toast('Fail PDF tidak dijumpai — pilih semula'); return; }
     const url = URL.createObjectURL(blob);
     const ext = () => { if (!window.open(url, '_blank')) location.href = url; };
@@ -2445,74 +2445,31 @@
     } catch (e) { inner.innerHTML = '<div class="note" style="margin:20px">⚠ PDF tidak dapat dibaca. Cuba <b>↗ Buka di pelayar</b>.</div>'; }
   }
   // ---- Dokumen trip (disertakan bersama app) ----
+  const inAppBrowser = /; wv\)|FBAN|FBAV|Instagram|Line\/|GSA\/|MicroMessenger|Snapchat|TikTok|Messenger/i.test(navigator.userAgent);
   function docsCardHTML() {
     const D = window.TRIP_SEED; if (!D || !D.docs || !D.docs.length) return '';
-    return '<div class="card"><b>📎 Dokumen trip</b><div class="small muted" style="margin:2px 0 6px">Boleh dibuka tanpa internet selepas disimpan.</div>' +
-      D.docs.map(d => '<div class="docrow" data-doc="' + esc(d.id) + '"><img class="docth" data-img="' + esc(d.thumb) + '" alt=""><div class="grow"><b translate="no">' + esc(d.title) + '</b><div class="small muted">' + esc(d.desc) + ' · ' + pdfMB(d.size) + '</div></div><div class="docbtns"><button class="btn pri sm" data-ia="docopen">📖 Buka</button><button class="btn sm" data-ia="docdl" aria-label="Muat turun" title="Muat turun">⬇ Simpan</button></div></div>').join('') +
+    return (inAppBrowser ? '<div class="note"><b>⚠️ Anda sedang guna pelayar dalam-app</b> (contoh dari kamera, Google Lens atau WhatsApp). Muat turun dan simpanan offline mungkin tak berfungsi.<br>Tekan <b>⋮</b> atau <b>⋯</b> → <b>Buka dalam Chrome</b> / <b>Open in Chrome</b>, atau salin link dan tampal dalam Chrome.</div>' : '') +
+      '<div class="card"><b>📎 Dokumen trip</b><div class="small muted" style="margin:2px 0 6px">Boleh dibuka tanpa internet selepas disimpan.</div>' +
+      D.docs.map(d => '<div class="docrow" data-doc="' + esc(d.id) + '"><img class="docth" data-img="' + esc(d.thumb) + '" alt=""><div class="grow"><b translate="no">' + esc(d.title) + '</b><div class="small muted">' + esc(d.desc) + ' · ' + pdfMB(d.size) + '</div><a class="small dlink" href="' + esc(d.path) + '" target="_blank" rel="noopener" download>🔗 Pautan terus (buka / muat turun)</a></div><div class="docbtns"><button class="btn pri sm" data-ia="docopen">📖 Buka</button><button class="btn sm" data-ia="docdl" aria-label="Muat turun" title="Muat turun">⬇ Simpan</button></div></div>').join('') +
       '<button class="btn pri block" data-ia="dlall" style="margin-top:12px">⬇ Muat turun semua (PDF + gambar)</button><div class="small muted" style="margin-top:6px">Satu fail ZIP: semua PDF, gambar peta & itinerari (teks). Tak perlu muat turun satu-satu.</div></div>';
   }
   async function ensureDoc(d) {
     let b = null; try { b = await ATT.get('doc:' + d.id); } catch (e) {}
     if (b) return b;
     if (!onWeb() || !navigator.onLine) return null;
-    try { const r = await fetch(d.path + '?v=' + window.TRIP_SEED.v, { cache: 'no-store' }); if (!r.ok) return null; b = await r.blob(); await ATT.put('doc:' + d.id, b); return b; } catch (e) { return null; }
+    try { const r = await fetch(d.path + '?v=' + window.TRIP_SEED.v, { cache: 'no-store' }); if (!r.ok) return null; b = await r.blob(); try { await ATT.put('doc:' + d.id, b); } catch (e) {} return b; } catch (e) { return null; }
   }
   async function openDoc(id) {
     const d = ((window.TRIP_SEED && TRIP_SEED.docs) || []).find(x => x.id === id); if (!d) return;
-    let have = false; try { have = !!(await ATT.get('doc:' + id)); } catch (e) {}
-    if (!have) {
+    let blob = null; try { blob = await ATT.get('doc:' + id); } catch (e) {}
+    if (!blob) {
       if (!onWeb()) { toast('Dokumen ini hanya tersedia dalam app yang dibuka dari laman web'); return; }
       if (!navigator.onLine) { toast('Dokumen belum disimpan — sambung internet sekali untuk muat turun'); return; }
-      toast('⏳ Memuat turun dokumen…'); const b = await ensureDoc(d);
-      if (!b) { toast('Gagal memuat turun dokumen'); return; }
+      toast('⏳ Memuat turun dokumen…'); blob = await ensureDoc(d);
+      if (!blob) { toast('Gagal memuat turun dokumen — dibuka terus di pelayar'); window.open(d.path, '_blank'); return; }
       warmPdfjs();
     }
-    pdfViewer('doc:' + id, d.title, d.path.split('/').pop());
-  }
-  // ---- ZIP tanpa pustaka (kaedah "store"): semua PDF + gambar + itinerari dalam satu fail ----
-  const CRC_T = (() => { const t = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
-  function crc32(u8) { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC_T[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
-  async function makeZip(files) {
-    const enc = new TextEncoder(), parts = [], cen = []; let off = 0;
-    const dt = new Date(), dosT = (dt.getHours() << 11) | (dt.getMinutes() << 5) | (dt.getSeconds() >> 1), dosD = ((dt.getFullYear() - 1980) << 9) | ((dt.getMonth() + 1) << 5) | dt.getDate();
-    for (const f of files) {
-      const data = new Uint8Array(await f.blob.arrayBuffer()), nm = enc.encode(f.name), crc = crc32(data);
-      const lh = new DataView(new ArrayBuffer(30));
-      lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(10, dosT, true); lh.setUint16(12, dosD, true);
-      lh.setUint32(14, crc, true); lh.setUint32(18, data.length, true); lh.setUint32(22, data.length, true); lh.setUint16(26, nm.length, true);
-      parts.push(lh.buffer, nm, data);
-      const ch = new DataView(new ArrayBuffer(46));
-      ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true); ch.setUint16(12, dosT, true); ch.setUint16(14, dosD, true);
-      ch.setUint32(16, crc, true); ch.setUint32(20, data.length, true); ch.setUint32(24, data.length, true); ch.setUint16(28, nm.length, true); ch.setUint32(42, off, true);
-      cen.push(ch.buffer, nm);
-      off += 30 + nm.length + data.length;
-    }
-    const cenSize = cen.reduce((a, x) => a + x.byteLength, 0), end = new DataView(new ArrayBuffer(22));
-    end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true); end.setUint32(12, cenSize, true); end.setUint32(16, off, true);
-    return new Blob(parts.concat(cen, [end.buffer]), { type: 'application/zip' });
-  }
-  async function downloadAll(btn) {
-    const D = window.TRIP_SEED || {}, files = []; let miss = 0; const label = btn ? btn.textContent : '';
-    const setB = t => { if (btn) btn.textContent = t; };
-    if (btn) btn.disabled = true;
-    try {
-      const docs = D.docs || [];
-      for (let i = 0; i < docs.length; i++) { setB('⏳ PDF ' + (i + 1) + '/' + docs.length + '…'); const b = await ensureDoc(docs[i]); if (b) files.push({ name: 'PDF/' + docs[i].path.split('/').pop(), blob: b }); else miss++; }
-      let own = null; try { own = await ATT.get('pdf'); } catch (e) {}
-      if (own && S.pdf && !S.pdf.off) files.push({ name: 'PDF/' + (S.pdf.name || 'pdf-saya.pdf'), blob: own });
-      const ids = []; (S.itin || []).forEach(x => (x.imgs || []).forEach(id => { if (!ids.includes(id)) ids.push(id); }));
-      for (let i = 0; i < ids.length; i++) {
-        setB('⏳ Gambar ' + (i + 1) + '/' + ids.length + '…');
-        let b = null; try { b = await ATT.get('img:' + ids[i]); } catch (e) {}
-        if (!b && onWeb() && navigator.onLine) { try { const r = await fetch('files/img/' + encodeURIComponent(ids[i]) + '.jpg', { cache: 'no-store' }); if (r.ok) b = await r.blob(); } catch (e) {} }
-        if (b) files.push({ name: 'Gambar/' + imgFileName(ids[i]), blob: b }); else miss++;
-      }
-      if (!files.length) { toast('Tiada fail untuk dimuat turun — sambung internet sekali'); return; }
-      files.push({ name: 'itinerari.txt', blob: new Blob([itText()], { type: 'text/plain;charset=utf-8' }) });
-      setB('⏳ Menyusun ZIP…');
-      await saveBlob(await makeZip(files), 'Arztech-Harbin-Trip-fail.zip');
-      if (miss) toast(miss + ' fail belum tersedia (tiada internet) — tidak dimasukkan');
-    } finally { if (btn) { btn.disabled = false; btn.textContent = label; } }
+    pdfViewer('doc:' + id, d.title, d.path.split('/').pop(), blob);
   }
   async function downloadDoc(id) {
     const d = ((window.TRIP_SEED && TRIP_SEED.docs) || []).find(x => x.id === id); if (!d) return;

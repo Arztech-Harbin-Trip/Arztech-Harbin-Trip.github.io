@@ -318,3 +318,5 @@ nav.tabs button{font-size:11px;padding:0 2px}
 .hotelrow{display:flex;gap:10px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--line)}
 .hotelrow:first-of-type{border-top:0}
 .hbtns{display:flex;flex-direction:column;gap:6px;flex:none}
+
+.dlink{display:inline-block;margin-top:4px;color:var(--accent);font-weight:600;text-decoration:none}
