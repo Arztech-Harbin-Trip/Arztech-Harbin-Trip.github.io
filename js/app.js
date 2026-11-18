@@ -36,7 +36,7 @@
   // ---------- Simpanan ----------
   const DEF = () => ({
     v: 1, tab: 'tr', check: {}, custom: [], tx: [], rate: 1.65, favs: [], mine: [],
-    hotel: { nameZh: '', nameEn: '', addr: '', phone: '' },
+    hotel: { nameZh: '', nameEn: '', addr: '', phone: '' }, hotels: [], hotelsHidden: [], hotelsMig: 0,
     trip: { start: '', end: '' }, vrate: 0.85, limit: 0, lastCur: 'CNY', itin: [], itinHidden: [], shared: null, sharedV: 0, announce: '', lang: 'ms', pdf: null, pdfSkip: 0
   });
   let S = DEF();
@@ -1373,6 +1373,58 @@
     const y = Math.sin(dl), x = Math.cos(lat * D2R) * Math.tan(mk.lat * D2R) - Math.sin(lat * D2R) * Math.cos(dl);
     return (Math.atan2(y, x) / D2R + 360) % 360;
   }
+  // ---- Kad hotel (banyak hotel) ----
+  function hotelsList() { return (S.hotels || []).slice().sort((x, y) => (x.from || '9999').localeCompare(y.from || '9999')); }
+  function ensureHotels() {
+    if (!Array.isArray(S.hotels)) S.hotels = [];
+    if (S.hotelsMig) return;
+    const H = S.hotel || {};
+    if ((H.nameZh || H.addr) && !S.hotels.some(x => x.addr === H.addr || x.nameZh === H.nameZh)) S.hotels.push({ id: 'h' + uid(), nameEn: H.nameEn || '', nameZh: H.nameZh || '', addr: H.addr || '', addrEn: '', from: '', to: '', phone: H.phone || '' });
+    S.hotelsMig = 1; save();
+  }
+  function showHotelCard(H) {
+    if (!H.nameZh && !H.addr) { toast('Isi nama atau alamat hotel dalam tulisan Cina dahulu'); return; }
+    showCard({ lead: '师傅，请带我去这家酒店：', zh: H.nameZh || H.addr, sub: H.nameZh ? H.addr : '', py: H.phone ? '☎ ' + H.phone : '', ms: 'Tolong bawa saya ke hotel ini' + (H.nameEn ? ': ' + H.nameEn : ''), en: 'Please take me to this hotel', say: '师傅，请带我去这家酒店：' + (H.nameZh || '') + '，' + (H.addr || '') });
+  }
+  function hotelsCardHTML() {
+    const t = today(), L = hotelsList();
+    return '<div class="card"><h3>🏨 Kad Hotel (tunjuk kepada pemandu teksi)</h3>' +
+      (L.length ? L.map(h => {
+        const now = h.from && h.to && t >= h.from && t <= h.to, n = h.from && h.to ? daysBetween(h.from, h.to) : 0;
+        return '<div class="hotelrow" data-hid="' + esc(h.id) + '"><div class="grow">' +
+          '<b translate="no">' + esc(h.nameEn || h.nameZh) + '</b>' + (now ? ' <span class="badge b-D">📍 Sekarang</span>' : '') +
+          (h.nameZh ? '<div class="zh" style="color:var(--red);font-weight:700;font-size:16px">' + esc(h.nameZh) + '</div>' : '') +
+          (h.from ? '<div class="small muted">' + fmtDs(h.from) + (h.to ? ' – ' + fmtDs(h.to) : '') + (n ? ' · ' + n + ' malam' : '') + '</div>' : '') +
+          (h.addrEn ? '<div class="small muted" translate="no">' + esc(h.addrEn) + '</div>' : '') +
+          (h.addr ? '<div class="small zh">' + esc(h.addr) + '</div>' : '') +
+          '</div><div class="hbtns"><button class="btn pri sm" data-a="hshow">⛶ Tunjuk</button><button class="btn sm" data-a="hcopy">📋 Salin alamat</button><button class="btn sm" data-a="hedit">✎ Ubah</button></div></div>';
+      }).join('') : '<div class="empty" style="padding:12px">Belum ada hotel. Tekan Tambah hotel.</div>') +
+      '<button class="btn block" data-a="hadd" style="margin-top:10px">➕ Tambah hotel</button></div>';
+  }
+  function hotelSheet(h) {
+    const isNew = !h, st = h ? Object.assign({}, h) : { id: '', nameEn: '', nameZh: '', addr: '', addrEn: '', from: '', to: '', phone: '' };
+    sheet('<h2>' + (isNew ? '🏨 Hotel baharu' : '✎ Ubah hotel') + '</h2>' +
+      '<label class="field"><span>Nama hotel dalam tulisan Cina</span><input class="input zh" id="hh-nz" value="' + esc(st.nameZh) + '" placeholder="Salin dari Trip.com / emel tempahan"></label>' +
+      '<label class="field"><span>Nama hotel (English)</span><input class="input" id="hh-ne" value="' + esc(st.nameEn) + '"></label>' +
+      '<label class="field"><span>Alamat dalam tulisan Cina</span><textarea class="input zh" id="hh-ad" rows="2">' + esc(st.addr) + '</textarea></label>' +
+      '<label class="field"><span>Alamat (English)</span><input class="input" id="hh-ae" value="' + esc(st.addrEn) + '"></label>' +
+      '<div class="grid2"><label class="field"><span>Tarikh masuk</span><input class="input" type="date" id="hh-f" value="' + esc(st.from) + '"></label><label class="field"><span>Tarikh keluar</span><input class="input" type="date" id="hh-t" value="' + esc(st.to) + '"></label></div>' +
+      '<label class="field"><span>No. telefon hotel</span><input class="input" id="hh-ph" inputmode="tel" value="' + esc(st.phone) + '"></label>' +
+      (st.off ? '<div class="note info small">📢 Hotel rasmi daripada penganjur. Jika anda ubah, versi anda dikekalkan.</div>' : '') +
+      '<div class="row"><button class="btn pri grow" id="hh-save">Simpan</button>' + (!isNew ? '<button class="btn red" id="hh-del">Padam</button>' : '') + '</div>', sh => {
+        $('#hh-save', sh).onclick = () => {
+          const o = Object.assign(st, { nameZh: $('#hh-nz', sh).value.trim(), nameEn: $('#hh-ne', sh).value.trim(), addr: $('#hh-ad', sh).value.trim(), addrEn: $('#hh-ae', sh).value.trim(), from: $('#hh-f', sh).value, to: $('#hh-t', sh).value, phone: $('#hh-ph', sh).value.trim() });
+          if (!o.nameZh && !o.addr && !o.nameEn) { toast('Isi nama atau alamat hotel dalam tulisan Cina dahulu'); return; }
+          if (!o.id) o.id = 'h' + uid(); if (o.off) o.mod = true;
+          S.hotels = (S.hotels || []).filter(x => x.id !== o.id).concat([o]); save(); closeSheet(); renderIn(); toast('Kad hotel disimpan');
+        };
+        if ($('#hh-del', sh)) $('#hh-del', sh).onclick = async () => {
+          if (!(await ask('Padam hotel ini?', 'Padam', true))) return;
+          if (st.off) S.hotelsHidden = (S.hotelsHidden || []).concat([st.id]);
+          S.hotels = (S.hotels || []).filter(x => x.id !== st.id); save(); closeSheet(); renderIn();
+        };
+      });
+  }
   function renderIn() {
     const v = $('#v-in');
     const H = S.hotel || {};
@@ -1384,12 +1436,7 @@
     h += '<div class="card"><h3>🗓️ Tarikh trip</h3><div class="grid2"><label class="field"><span>Pergi</span><input class="input" type="date" id="tr-s" value="' + esc(S.trip.start) + '"></label><label class="field"><span>Balik</span><input class="input" type="date" id="tr-e" value="' + esc(S.trip.end) + '"></label></div>' +
       (S.trip.start && S.trip.end ? '<div class="small muted">' + (daysBetween(S.trip.start, S.trip.end) + 1) + ' hari, ' + daysBetween(S.trip.start, S.trip.end) + ' malam</div>' : '<div class="small muted">Isi tarikh untuk kira detik ke Harbin.</div>') + '</div>';
 
-    h += '<div class="card"><h3>🏨 Kad Hotel (tunjuk kepada pemandu teksi)</h3>' +
-      '<label class="field"><span>Nama hotel dalam tulisan Cina</span><input class="input zh" id="h-nz" value="' + esc(H.nameZh) + '" placeholder="Salin dari Trip.com / emel tempahan"></label>' +
-      '<label class="field"><span>Nama hotel (English)</span><input class="input" id="h-ne" value="' + esc(H.nameEn) + '"></label>' +
-      '<label class="field"><span>Alamat dalam tulisan Cina</span><textarea class="input zh" id="h-ad" rows="2">' + esc(H.addr) + '</textarea></label>' +
-      '<label class="field"><span>No. telefon hotel</span><input class="input" id="h-ph" inputmode="tel" value="' + esc(H.phone) + '"></label>' +
-      '<div class="grid2"><button class="btn" data-a="savehotel">💾 Simpan</button><button class="btn pri" data-a="showhotel">⛶ Tunjuk kad</button></div></div>';
+    h += hotelsCardHTML();
 
     h += '<div class="card"><h3>📍 Tempat popular — tunjuk kepada pemandu</h3><p class="small muted" style="margin-top:0">Tekan untuk paparan besar “Pakcik, tolong bawa saya ke…”.</p>' +
       (window.PLACES || []).map((p, i) => '<div class="place" data-place="' + i + '"><div class="grow"><div class="zh">' + esc(p[0]) + '</div><div class="small"><b>' + esc(p[2]) + '</b> <span class="muted">· ' + esc(p[1]) + '</span></div><div class="small muted">' + esc(p[3]) + '</div></div><span class="muted">⛶</span></div>').join('') + '</div>';
@@ -1453,7 +1500,7 @@
       '<li>Sentiasa buka app dari ikon Home Screen (data disimpan di situ).</li></ol>' +
       '<p class="small muted" style="margin:6px 0 0">Status: ' + (navigator.serviceWorker && navigator.serviceWorker.controller ? '✓ App sudah disimpan untuk guna offline.' : (location.protocol === 'file:' ? 'Dibuka sebagai fail tempatan.' : 'Belum disimpan offline — muat semula halaman sekali semasa online.')) + '</p></div>';
 
-    h += '<p class="small muted" style="text-align:center">Arztech Harbin Trip v13.1 · Semua harga & maklumat ialah anggaran — sahkan sebelum berlepas.</p>';
+    h += '<p class="small muted" style="text-align:center">Arztech Harbin Trip v14 · Semua harga & maklumat ialah anggaran — sahkan sebelum berlepas.</p>';
     v.innerHTML = h;
 
     const saveTrip = () => { S.trip.start = $('#tr-s').value; S.trip.end = $('#tr-e').value; save(); updateHeader(); };
@@ -1477,7 +1524,6 @@
       r.readAsText(f);
     });
   }
-  function hotelVals() { return { nameZh: $('#h-nz').value.trim(), nameEn: $('#h-ne').value.trim(), addr: $('#h-ad').value.trim(), phone: $('#h-ph').value.trim() }; }
   $('#v-in').addEventListener('click', e => {
     const pl = e.target.closest('[data-place]');
     if (pl) { const p = PLACES[+pl.dataset.place]; showCard({ lead: '师傅，请带我去：', zh: p[0], py: p[1], ms: 'Pakcik, tolong bawa saya ke: ' + p[2], en: 'Please take me to: ' + p[2] }); return; }
@@ -1512,12 +1558,13 @@
     }
     if (a === 'syncnow') { syncShared(true); return; }
     if (a === 'sharelink') { navigator.share({ title: 'Arztech Harbin Trip', text: 'App Arztech Harbin Trip — terjemahan, itinerari & bajet (boleh guna offline)', url: siteBase() }).catch(() => {}); return; }
-    if (a === 'savehotel') { S.hotel = hotelVals(); save(); toast('Kad hotel disimpan'); }
-    else if (a === 'showhotel') {
-      S.hotel = hotelVals(); save();
-      const H = S.hotel;
-      if (!H.nameZh && !H.addr) { toast('Isi nama atau alamat hotel dalam tulisan Cina dahulu'); return; }
-      showCard({ lead: '师傅，请带我去这家酒店：', zh: H.nameZh || H.addr, sub: H.nameZh ? H.addr : '', py: H.phone ? '☎ ' + H.phone : '', ms: 'Tolong bawa saya ke hotel ini' + (H.nameEn ? ': ' + H.nameEn : ''), en: 'Please take me to this hotel' });
+    if (a === 'hadd') { hotelSheet(null); return; }
+    if (a === 'hedit' || a === 'hshow' || a === 'hcopy') {
+      const hr = b.closest('[data-hid]'); const H = hr && (S.hotels || []).find(x => x.id === hr.dataset.hid); if (!H) return;
+      if (a === 'hedit') hotelSheet(H);
+      else if (a === 'hcopy') copyText((H.nameZh ? H.nameZh + ' ' : '') + (H.addr || ''));
+      else showHotelCard(H);
+      return;
     }
     else if (a === 'testv') speak('您好，我来自马来西亚');
     else if (a === 'gotr') setTab('tr');
@@ -1623,7 +1670,7 @@
       '<label class="field"><span>Tajuk *</span><input class="input" id="i-title" value="' + esc(st.title) + '" placeholder="Contoh: Ice & Snow World (malam)"></label>' +
       '<label class="field"><span>Lokasi</span><input class="input" id="i-loc" value="' + esc(st.loc) + '" placeholder="Contoh: Harbin Ice and Snow World"></label>' +
       '<label class="field"><span>Nama / alamat lokasi dalam tulisan Cina (untuk pemandu)</span><input class="input zh" id="i-locZh" value="' + esc(st.locZh) + '" placeholder="Contoh: 哈尔滨冰雪大世界"></label>' +
-      '<label class="field"><span>…atau pilih tempat popular</span><select class="input" id="i-place"><option value="">— Pilih —</option>' + (window.PLACES || []).map((p, i) => '<option value="' + i + '">' + esc(p[2]) + ' · ' + esc(p[0]) + '</option>').join('') + (S.hotel && S.hotel.nameZh ? '<option value="hotel">🏨 Hotel saya · ' + esc(S.hotel.nameZh) + '</option>' : '') + '</select></label>' +
+      '<label class="field"><span>…atau pilih tempat popular</span><select class="input" id="i-place"><option value="">— Pilih —</option>' + (window.PLACES || []).map((p, i) => '<option value="' + i + '">' + esc(p[2]) + ' · ' + esc(p[0]) + '</option>').join('') + hotelsList().map(h => '<option value="hotel:' + esc(h.id) + '">🏨 ' + esc(h.nameEn || h.nameZh) + '</option>').join('') + '</select></label>' +
       '<label class="field"><span>Butiran</span><textarea class="input" id="i-detail" rows="3" placeholder="Apa nak buat, tiket, pakaian, dll.">' + esc(st.detail) + '</textarea></label>' +
       '<label class="field"><span>Remark / tempat jumpa</span><textarea class="input" id="i-remark" rows="2" placeholder="Contoh: Jumpa di lobi hotel 8:30 pagi. Bawa pasport.">' + esc(st.remark) + '</textarea></label>' +
       '<div class="field"><span>📷 Gambar</span><div class="thumbs" id="i-imgs"></div><input type="file" id="i-file" accept="image/*" multiple hidden><button class="btn block" id="i-addimg" type="button">➕ Tambah gambar (kamera / galeri)</button></div>' +
@@ -1644,7 +1691,7 @@
         });
         $('#i-place', sh).addEventListener('change', e => {
           const val = e.target.value; if (!val) return;
-          if (val === 'hotel') { $('#i-loc', sh).value = S.hotel.nameEn || 'Hotel'; $('#i-locZh', sh).value = S.hotel.nameZh + (S.hotel.addr ? '（' + S.hotel.addr + '）' : ''); if (!$('#i-phone', sh).value) $('#i-phone', sh).value = S.hotel.phone || ''; }
+          if (val.startsWith('hotel:')) { const H = (S.hotels || []).find(x => x.id === val.slice(6)); if (H) { $('#i-loc', sh).value = H.nameEn || H.nameZh; $('#i-locZh', sh).value = (H.nameZh || '') + (H.addr ? '（' + H.addr + '）' : ''); if (!$('#i-phone', sh).value) $('#i-phone', sh).value = H.phone || ''; if (!$('#i-title', sh).value) $('#i-title', sh).value = H.nameEn || H.nameZh; } }
           else { const p = PLACES[+val]; $('#i-loc', sh).value = p[2]; $('#i-locZh', sh).value = p[0]; if (!$('#i-title', sh).value) $('#i-title', sh).value = p[2]; }
         });
         st.imgs = (st.imgs || []).slice(); const rmImgs = [];
@@ -1764,7 +1811,7 @@
     const mk = (d, t1, t2, type, title, loc, locZh, detail, remark) => ({ id: uid(), d, t1, t2, type, title: T_(title), loc, locZh, detail: T_(detail), remark: T_(remark), ref: '', phone: '', cost: '', cur: 'CNY', done: false });
     const L = [
       mk(D(0), '', '', 'flight', 'Tiba di Harbin', 'Harbin Taiping International Airport', '哈尔滨太平国际机场', 'Ambil bagasi, aktifkan roaming/eSIM, pakai jaket sebelum keluar terminal.', 'Isi waktu & no. penerbangan.'),
-      mk(D(0), '', '', 'hotel', 'Daftar masuk hotel', S.hotel.nameEn || 'Hotel', S.hotel.nameZh || '', 'Simpan bagasi, rehat.', ''),
+      mk(D(0), '', '', 'hotel', 'Daftar masuk hotel', (hotelsList()[0] || {}).nameEn || 'Hotel', (hotelsList()[0] || {}).nameZh || '', 'Simpan bagasi, rehat.', ''),
       mk(D(0), '17:00', '20:00', 'activity', 'Jalan-jalan Central Street & St. Sophia (malam)', 'Central Street', '中央大街', 'Lampu menyala sekitar 4 petang. Cuba aiskrim Madieer.', ''),
       mk(D(1), '10:00', '12:00', 'activity', 'Songhua River Ice & Snow Carnival', 'Songhua River', '松花江冰雪嘉年华', 'Kereta luncur, gelongsor ais.', 'Pakai ice cleats.'),
       mk(D(1), '15:00', '21:00', 'activity', 'Harbin Ice & Snow World', 'Harbin Ice and Snow World', '哈尔滨冰雪大世界', 'Masuk sebelum matahari terbenam untuk lihat siang & malam.', 'Semak tarikh buka. Bawa powerbank & heat pack.'),
@@ -1850,6 +1897,7 @@
       announce: (S.announce || '').trim(),
       trip: inc.trip ? Object.assign({}, S.trip) : null,
       hotel: inc.trip ? Object.assign({}, S.hotel) : null,
+      hotels: inc.trip ? hotelsList().map(h => { const o = {}; ['id', 'nameEn', 'nameZh', 'addr', 'addrEn', 'from', 'to', 'phone'].forEach(k => { if (h[k]) o[k] = h[k]; }); return o; }) : null,
       itin: inc.itin && !liveReady() ? sortIt((S.itin || []).filter(x => !x.priv)).map(stripIt) : null,
       live: liveCfg().db ? { db: liveCfg().db } : null,
       pdf: (inc.att !== false && S.pdf && !S.pdf.off && S.pdf.share !== false && S.pdf.pubU === S.pdf.u) ? { name: S.pdf.name, size: S.pdf.size, u: S.pdf.u, path: 'files/itinerari.pdf' } : null,
@@ -1880,6 +1928,10 @@
     S.shared = d; S.sharedV = d.v;
     if (d.trip && d.trip.start) S.trip = Object.assign({}, S.trip, d.trip);
     if (d.hotel && (d.hotel.nameZh || d.hotel.addr || d.hotel.nameEn)) S.hotel = Object.assign({}, d.hotel);
+    if (Array.isArray(d.hotels)) {
+      const hid = new Set(S.hotelsHidden || []), keepH = (S.hotels || []).filter(x => !x.off || x.mod), modH = new Set(keepH.filter(x => x.off).map(x => x.id));
+      S.hotels = keepH.concat(d.hotels.filter(x => !modH.has(x.id) && !hid.has(x.id)).map(x => Object.assign({}, x, { off: true, mod: false })));
+    }
     if (Array.isArray(d.itin) && !liveReady()) {
       const prev = {};
       (S.itin || []).filter(x => x.off).forEach(x => { prev[x.id] = x; });
@@ -2432,7 +2484,13 @@
   function applySeed() {
     const D = window.TRIP_SEED; if (!D || S.seedV === D.v) return;
     if (D.trip && !S.trip.start) S.trip = Object.assign({}, D.trip);
-    if (D.hotel && !(S.hotel && (S.hotel.nameZh || S.hotel.addr))) S.hotel = Object.assign({}, D.hotel);
+    if (!Array.isArray(S.hotels)) S.hotels = [];
+    const hh = new Set(S.hotelsHidden || []), hById = {}; S.hotels.forEach(x => { hById[x.id] = x; });
+    (D.hotels || []).forEach(h => {
+      if (hh.has(h.id)) return; const cur = hById[h.id];
+      if (!cur) S.hotels.push(Object.assign({}, h, { off: true, mod: false, seed: 1 }));
+      else if (cur.seed && !cur.mod) Object.assign(cur, h, { off: true, seed: 1 });
+    });
     const hidden = new Set(S.itinHidden || []); S.itin = S.itin || [];
     const byId = {}; S.itin.forEach(x => { byId[x.id] = x; });
     D.itin.forEach(it => {
@@ -2522,7 +2580,7 @@
   window.addEventListener('offline', updateHeader);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeSheet(); $$('.show,.imgv').forEach(x => x.remove()); const pv = $('.pdfv [data-x="c"]'); if (pv) pv.click(); } });
 
-  applySeed();
+  applySeed(); ensureHotels();
   if (!RENDER[S.tab]) S.tab = 'tr';
   setTab(S.tab);
   updateHeader();

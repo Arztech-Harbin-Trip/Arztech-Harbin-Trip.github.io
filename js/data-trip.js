@@ -2,9 +2,14 @@
    Dimuatkan sekali ke dalam app (aktiviti bertanda 📢 Rasmi). Pengguna boleh ubah/padam; ubahan mereka dikekalkan.
    Naikkan `v` bila kandungan ini dikemas kini supaya app menerimanya. */
 window.TRIP_SEED = {
-  v: 1,
+  v: 2,
   trip: { start: '2026-12-04', end: '2026-12-13' },
-  hotel: { nameZh: '宜致酒店中央大街店', nameEn: 'Ease Hotel (Harbin Central Street)', addr: '哈尔滨道里区西十六道街19号', phone: '' },
+  hotels: [
+    { id: 'hz1', nameEn: 'Ease Hotel (Harbin Central Street)', nameZh: '宜致酒店中央大街店', addr: '哈尔滨道里区西十六道街19号', addrEn: 'No. 19, West 16th Street, Daoli District, Harbin', from: '2026-12-05', to: '2026-12-07' },
+    { id: 'hz2', nameEn: 'Snow Town Jingya Villa', nameZh: '雪乡静雅山庄', addr: '海林长汀镇大海林局址雪乡景区河南路1号', addrEn: 'No. 1 Henan Road, Snow Town Scenic Area, Hailin', from: '2026-12-07', to: '2026-12-08' },
+    { id: 'hz3', nameEn: 'Longjiang Gaosheng Inn', nameZh: '龙江高升客栈', addr: '五常山河屯林业局东升林场中国雪谷', addrEn: 'China Snow Valley, Dongsheng Forest Farm, Wuchang', from: '2026-12-08', to: '2026-12-10' },
+    { id: 'hz4', nameEn: 'Homeinn Selected Hotel (Central Avenue Memorial Flood Control Tower)', nameZh: '如家精选酒店中央大街防洪纪念塔店', addr: '哈尔滨道里区友谊路225号', addrEn: 'No. 225 Youyi Road, Daoli District, Harbin', from: '2026-12-10', to: '2026-12-12' }
+  ],
   docs: [
     { id: 'itin', title: 'Itinerari Arztech Trip to Harbin 2026', desc: 'Jadual harian, penerbangan, penginapan, PIC & bajet (5 muka surat)', path: 'files/itinerari-arztech-2026.pdf', thumb: 'dt-itin', size: 420407 },
     { id: 'maps', title: 'Harbin City Maps', desc: 'Peta hotel, laluan jalan kaki, restoran halal & peta pelancongan (14 muka surat)', path: 'files/harbin-city-maps.pdf', thumb: 'dt-maps', size: 2970311 }
