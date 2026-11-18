@@ -1452,6 +1452,8 @@
       '<p class="small" style="margin:10px 0 4px">🧭 Arah kiblat dari Harbin: <b>' + qb.toFixed(0) + '°</b> dari Utara (arah Barat, sedikit ke Barat Laut).</p>' +
       '<p class="small muted" style="margin:0">Anggaran dikira offline (Subuh 20°, Isyak 18°, Asar Syafie, +2 minit ihtiyat). Waktu China (UTC+8) sama dengan Malaysia. Siang sangat pendek — Maghrib sekitar 3:50 petang.</p></div>';
 
+    if (!window.HARBIN_SINGLE) h += '<div class="card"><h3>📸 Flashcard gambar</h3><p class="small muted" style="margin-top:0">30 cara ambil gambar cantik di Harbin, dengan contoh grid. Boleh dibuka tanpa internet.</p><a class="btn pri" href="foto.html" style="width:100%;text-decoration:none">📸 Buka flashcard</a></div>';
+
     h += '<div class="card"><h3>❄️ Cuaca & tips penting</h3><ul class="list-plain">' +
       '<li><b>Suhu Disember:</b> siang sekitar −10°C hingga −15°C, malam −20°C hingga −30°C. Angin membuatkan rasa lebih sejuk.</li>' +
       '<li><b>Ice & Snow World</b> biasanya dibuka pertengahan–akhir Disember. Jika trip awal Disember, semak tarikh pembukaan dahulu.</li>' +
@@ -1500,7 +1502,7 @@
       '<li>Sentiasa buka app dari ikon Home Screen (data disimpan di situ).</li></ol>' +
       '<p class="small muted" style="margin:6px 0 0">Status: ' + (navigator.serviceWorker && navigator.serviceWorker.controller ? '✓ App sudah disimpan untuk guna offline.' : (location.protocol === 'file:' ? 'Dibuka sebagai fail tempatan.' : 'Belum disimpan offline — muat semula halaman sekali semasa online.')) + '</p></div>';
 
-    h += '<p class="small muted" style="text-align:center">Arztech Harbin Trip v14 · Semua harga & maklumat ialah anggaran — sahkan sebelum berlepas.</p>';
+    h += '<p class="small muted" style="text-align:center">Arztech Harbin Trip v14.1 · Semua harga & maklumat ialah anggaran — sahkan sebelum berlepas.</p>';
     v.innerHTML = h;
 
     const saveTrip = () => { S.trip.start = $('#tr-s').value; S.trip.end = $('#tr-e').value; save(); updateHeader(); };
@@ -2045,7 +2047,7 @@
   //    Offline: perubahan disimpan dalam baris gilir & dihantar bila online.
   // =====================================================================
   // Ciri ditangguhkan: tukar kepada true untuk hidupkan semula itinerari bersama (Firebase)
-  const LIVE_FEATURE = true;
+  const LIVE_FEATURE = false;
   const LV = { es: null, status: 'off', retry: null, lastWho: '', flushing: false };
   const LIVE_FIELDS = ['id', 'd', 't1', 't2', 'type', 'title', 'loc', 'locZh', 'detail', 'remark', 'ref', 'phone', 'cost', 'cur', 'imgs', 'u', 'by'];
   function liveCfg() { if (!S.live || typeof S.live !== 'object') S.live = {}; const d = { db: '', code: '', on: false }; Object.keys(d).forEach(k => { if (S.live[k] === undefined) S.live[k] = d[k]; }); return S.live; }

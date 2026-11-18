@@ -1,8 +1,8 @@
 /* Service worker: simpan semua fail app supaya boleh dibuka tanpa internet. */
-const CACHE = 'harbin-trip-v14';
+const CACHE = 'harbin-trip-v14b';
 const ASSETS = [
   './', 'index.html', 'admin.html', 'manifest-admin.webmanifest', 'vendor/qrcode.js', 'css/style.css', 'js/app.js', 'js/mt.js', 'js/i18n.js', 'js/data-phrases.js', 'js/data-checklist.js', 'js/data-glossary.js', 'js/data-trip.js',
-  'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'
+  'manifest.webmanifest', 'foto.html', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'
 ];
 // Fail enjin terjemahan (besar) — disimpan bila pakej terjemahan dimuat turun
 const LAZY = ['vendor/transformers.min.js', 'vendor/ort-wasm-simd-threaded.jsep.mjs', 'vendor/ort-wasm-simd-threaded.jsep.wasm', 'vendor/pinyin-pro.js', 'vendor/pdf.min.js', 'vendor/pdf.worker.min.js'];

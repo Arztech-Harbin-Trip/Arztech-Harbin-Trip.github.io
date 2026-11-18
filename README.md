@@ -11,7 +11,7 @@ Web app untuk trip ke Harbin (Disember). Ia **berfungsi tanpa internet** selepas
 | 🗓️ **Itinerari** | Aktiviti disusun ikut hari (Hari 1, Hari 2…), dijana daripada tarikh trip. Setiap aktiviti boleh ada tarikh, masa mula/tamat, jenis, tajuk, lokasi + nama Cina, butiran, remark/tempat jumpa, no. tempahan, telefon dan anggaran kos. Kos boleh direkod ke Kewangan. Butang 🚕 tunjuk lokasi kepada pemandu, tanda selesai dan penanda "SETERUSNYA". Setiap hari tunjuk waktu matahari terbit/terbenam Harbin. Ada salin ke WhatsApp, CSV dan contoh itinerari. |
 | ✅ **Persiapan** | 118 item dalam 10 kategori: dokumen, kos perjalanan, pakaian 3 lapisan, heat pack, elektronik, toiletries, ubat & first aid, makanan, aplikasi & kewangan, beg. Setiap item ada nota, tahap keutamaan (Wajib/Disyorkan/Pilihan), kuantiti dan harga anggaran (RM). Bila ditanda **Dah beli**, harga sebenar direkod terus ke Kewangan. Tab **💰 Bajet & bayaran** ada beberapa fungsi. Kau boleh **ubah harga terus** (contoh tiket RM2,200 → RM1,200). Kau **tanda ☑ bila dah bayar** dan jumlah itu ditolak daripada "belum bayar". Kau tetapkan **jumlah bajet sendiri** dan app tunjuk baki/kekurangan. Bayaran juga direkod automatik ke Kewangan. |
 | 💰 **Kewangan** | Rekod **Keluar / Masuk / Tukar duit (RM → ¥)** dengan kategori, cara bayar (Tunai, Alipay, WeChat Pay, Kad, TNG) dan keterangan. Ada ringkasan **harian** (hari ini beli apa, keluar dan masuk berapa) dan ringkasan setiap hari, dalam ¥ dan RM. Ada juga baki tunai RMB, carta ikut kategori, penukar kadar, eksport CSV dan teks ringkasan. |
-| ℹ️ **Info** | Kad hotel untuk pemandu teksi, 17 tempat popular Harbin (kad "师傅，请带我去…"), nombor kecemasan, Kedutaan Malaysia, waktu solat Harbin & arah kiblat (dikira offline), tips cuaca sejuk, tetapan suara, dan backup/pulih data. |
+| ℹ️ **Info** | Kad hotel untuk pemandu teksi, 17 tempat popular Harbin (kad "师傅，请带我去…"), nombor kecemasan, Kedutaan Malaysia, waktu solat Harbin & arah kiblat (dikira offline), flashcard 30 cara ambil gambar, tips cuaca sejuk, tetapan suara, dan backup/pulih data. |
 
 ## Dua link: Admin & Pengguna
 
@@ -70,3 +70,9 @@ Repo laman mesti **public** untuk GitHub Pages percuma.
 | `tools/deploy-site.sh` | Salin app ke repo laman |
 | `tools/build-single.js` | `node tools/build-single.js` jana `dist/harbin-trip-offline.html` |
 | `tools/make-icons.js` | Jana ikon PNG daripada `icons/icon.svg` |
+| `docs/Panduan-Gambar-Harbin.pdf` | 30 contoh cara ambil gambar cantik di Harbin, dengan grid kamera |
+| `tools/make-photo-guide.js` | `node tools/make-photo-guide.js` jana semula PDF panduan gambar |
+| `foto.html` | Flashcard 30 cara ambil gambar (offline). Dibuka dari tab Info → 📸 Flashcard gambar |
+| `tools/make-photo-cards.js` | `node tools/make-photo-cards.js` jana semula `foto.html` |
+| `docs/Flashcard-Gambar-Harbin.pdf` | Flashcard yang sama dalam PDF saiz telefon: satu kad satu muka, senarai boleh ditekan |
+| `tools/make-photo-cards-pdf.js` | `node tools/make-photo-cards-pdf.js` jana semula PDF flashcard |
